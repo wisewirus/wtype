@@ -546,7 +546,7 @@ class MainWindow(QMainWindow):
         if destination.suffix.lower() != ".pdf":
             destination = destination.with_suffix(".pdf")
         try:
-            self.pdf_exporter.export(self.session.current_markdown, destination)
+            self.pdf_exporter.export_document(self.editor.document(), destination)
         except (PdfExportError, OSError) as exc:
             self._show_error("Could not export PDF", str(exc))
             return

@@ -76,6 +76,23 @@ class PdfExporter:
     def export(self, markdown: str, destination: Path) -> None:
         destination = destination.expanduser().resolve()
         document = self._print_document(markdown, destination.stem)
+        self._write_pdf(document, destination)
+
+    def export_document(self, source: QTextDocument, destination: Path) -> None:
+        """Export an existing rich-text document without a Markdown round-trip.
+
+        Adjacent bold and italic spans can serialize to ambiguous Markdown,
+        particularly within right-to-left words. Cloning the editor document
+        preserves the exact QTextCharFormat ranges while keeping PDF-specific
+        styling isolated from the live editor.
+        """
+
+        destination = destination.expanduser().resolve()
+        document = self._print_source_document(source, destination.stem)
+        self._write_pdf(document, destination)
+
+    @staticmethod
+    def _write_pdf(document: QTextDocument, destination: Path) -> None:
 
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
@@ -99,16 +116,32 @@ class PdfExporter:
 
     def _print_document(self, markdown: str, title: str) -> QTextDocument:
         document = QTextDocument()
+        self._configure_document(document, title)
+        document.setMarkdown(
+            markdown,
+            QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
+        )
+        self._style_document(document)
+        return document
+
+    def _print_source_document(
+        self,
+        source: QTextDocument,
+        title: str,
+    ) -> QTextDocument:
+        document = source.clone()
+        self._configure_document(document, title)
+        self._style_document(document)
+        return document
+
+    def _configure_document(self, document: QTextDocument, title: str) -> None:
         font = QFont(self.preferred_pdf_font(), 11)
         font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
         document.setDefaultFont(font)
         document.setDocumentMargin(0)
         document.setMetaInformation(QTextDocument.MetaInformation.DocumentTitle, title)
-        document.setMarkdown(
-            markdown,
-            QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
-        )
 
+    def _style_document(self, document: QTextDocument) -> None:
         code_font = QFont(self.preferred_code_font(), 10)
         code_font.setFixedPitch(True)
         code_background = QColor(128, 128, 128, 24)
@@ -158,7 +191,6 @@ class PdfExporter:
             block = block.next()
 
         self._style_tables(document)
-        return document
 
     @staticmethod
     def _is_code_block(block: QTextBlock) -> bool:
