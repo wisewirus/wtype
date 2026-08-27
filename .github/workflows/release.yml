@@ -1,0 +1,162 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag matching the project version, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  quality:
+    name: Test and build source packages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install test and build dependencies
+        run: python -m pip install -e ".[dev]" build
+      - name: Check release version
+        shell: bash
+        run: |
+          package_version=$(python -c "from importlib.metadata import version; print(version('wtype'))")
+          if [[ "$RELEASE_TAG" != "v$package_version" ]]; then
+            echo "Release tag $RELEASE_TAG does not match package version v$package_version."
+            exit 1
+          fi
+      - name: Run quality checks
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          pytest
+          ruff check .
+          mypy
+      - name: Build wheel and source archive
+        run: python -m build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: WType-source
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  applications:
+    name: Build ${{ matrix.label }} application
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: Linux x86_64
+            platform: linux
+            arch: x86_64
+          - os: windows-2025
+            label: Windows x86_64
+            platform: windows
+            arch: x86_64
+          - os: macos-15-intel
+            label: macOS Intel
+            platform: macos
+            arch: x86_64
+          - os: macos-15
+            label: macOS Apple silicon
+            platform: macos
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install WType
+        run: python -m pip install .
+      - name: Build application
+        run: |
+          python -c "from pathlib import Path; Path('dist').mkdir(exist_ok=True)"
+          pyside6-deploy -c pysidedeploy.spec --force
+      - name: Package Linux application
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          version=${RELEASE_TAG#v}
+          mkdir -p package/WType release
+          install -m 0755 dist/WType.bin package/WType/WType
+          cp LICENSE README.md package/WType/
+          tar -C package -czf "release/WType-$version-linux-${{ matrix.arch }}.tar.gz" WType
+      - name: Package Windows application
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart("v")
+          New-Item -ItemType Directory -Force package/WType, release
+          Copy-Item dist/WType.exe package/WType/WType.exe
+          Copy-Item LICENSE, README.md package/WType/
+          Compress-Archive -Path package/WType -DestinationPath "release/WType-$version-windows-${{ matrix.arch }}.zip"
+      - name: Package macOS application
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          version=${RELEASE_TAG#v}
+          mkdir -p package/WType release
+          cp -R dist/WType.app package/WType/
+          cp LICENSE README.md package/WType/
+          ditto -c -k --sequesterRsrc --keepParent package/WType \
+            "release/WType-$version-macos-${{ matrix.arch }}.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: WType-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: [quality, applications]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Generate checksums
+        shell: bash
+        run: sha256sum release-assets/* > release-assets/SHA256SUMS.txt
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --generate-notes \
+              --latest \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "WType $RELEASE_TAG"
+          fi
