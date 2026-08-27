@@ -4,7 +4,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtGui import QTextFormat
+from PySide6.QtGui import QFontDatabase, QTextFormat
 from PySide6.QtPdf import QPdfDocument
 
 from wtype.app import _load_bundled_fonts
@@ -13,7 +13,13 @@ from wtype.typography import CODE_FONT_FAMILY
 
 
 def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    _load_bundled_fonts()
     destination = tmp_path / "document.pdf"
+
+    pdf_font = PdfExporter.preferred_pdf_font()
+    assert QFontDatabase.WritingSystem.Arabic in QFontDatabase.writingSystems(
+        pdf_font
+    ), pdf_font
 
     PdfExporter().export("# Hello\n\nسلام دنیا\n", destination)
 

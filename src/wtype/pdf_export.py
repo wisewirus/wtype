@@ -37,18 +37,19 @@ class PdfExporter:
         "Noto Sans",
         "DejaVu Sans",
     )
-    # Some variable Arabic fonts render correctly but produce unreliable PDF
-    # Unicode maps in Qt. Prefer fixed desktop fonts with stable text extraction.
+    # Use one font with native Arabic coverage so Qt does not mix a Latin-only
+    # base font with platform fallback glyphs. Mixed-font fallback can produce
+    # invalid ToUnicode maps in PDFs, particularly through CoreText on macOS.
     PDF_FONTS = (
-        "Outfit",
         "DejaVu Sans",
         "Arial",
         "Segoe UI",
         "Geeza Pro",
-        "Vazirmatn",
         "Noto Sans Arabic",
         "Noto Naskh Arabic",
+        "Vazirmatn",
         "Noto Sans",
+        "Outfit",
     )
     CODE_FONTS = CODE_FONT_FAMILIES
 
@@ -63,6 +64,11 @@ class PdfExporter:
 
     @classmethod
     def preferred_pdf_font(cls) -> str:
+        installed = set(QFontDatabase.families())
+        arabic = QFontDatabase.WritingSystem.Arabic
+        for family in cls.PDF_FONTS:
+            if family in installed and arabic in QFontDatabase.writingSystems(family):
+                return family
         return cls._preferred_font(cls.PDF_FONTS)
 
     @classmethod
