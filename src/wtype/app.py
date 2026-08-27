@@ -33,7 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     QCoreApplication.setOrganizationName("WType")
     QCoreApplication.setOrganizationDomain("wtype.local")
     QCoreApplication.setApplicationName("WType")
-    QCoreApplication.setApplicationVersion("0.1.0")
+    QCoreApplication.setApplicationVersion("0.1.1")
 
     app = QApplication(arguments)
     app.setAttribute(Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)

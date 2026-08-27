@@ -112,8 +112,8 @@ GitHub Actions builds all supported release archives when a version tag is
 pushed. The tag must match the version in `pyproject.toml`:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 The release can also be started from **Actions → Release → Run workflow** with a
