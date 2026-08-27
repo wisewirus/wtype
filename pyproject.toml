@@ -41,6 +41,9 @@ wtype = "wtype.app:main"
 [tool.setuptools]
 package-dir = { "" = "src" }
 
+[tool.setuptools.package-data]
+wtype = ["assets/*.ttf", "assets/*.txt"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

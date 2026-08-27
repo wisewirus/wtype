@@ -26,12 +26,15 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QSlider,
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from wtype.actions import ActionRegistry
+from wtype.background_effect import BackgroundEffect
 from wtype.commands import COMMAND_SPECS
 from wtype.document_service import (
     DocumentError,
@@ -52,6 +55,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 820)
         self.setMinimumSize(760, 520)
         self.setUnifiedTitleAndToolBarOnMac(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self.document_service = DocumentService()
         self.recovery_service = RecoveryService()
@@ -59,6 +63,10 @@ class MainWindow(QMainWindow):
         self.settings = QSettings()
         self.session = DocumentSession()
         self._loading = False
+        self.theme_preference = "system"
+        self.background_opacity = 100
+        self.blur_enabled = False
+        self.background_effect = BackgroundEffect(self)
 
         self.editor = MarkdownEditor(self)
         self.editor.setObjectName("editor")
@@ -80,6 +88,7 @@ class MainWindow(QMainWindow):
 
         if initial_path is not None:
             self.open_path(initial_path)
+        QTimer.singleShot(0, self._initialize_background_effect)
         QTimer.singleShot(0, self._offer_recovery)
 
     # Construction ------------------------------------------------------
@@ -219,6 +228,38 @@ class MainWindow(QMainWindow):
             theme_menu.addAction(action)
             self.theme_actions[preference] = action
 
+        view_menu.addSeparator()
+        opacity_menu = view_menu.addMenu("Background Opacity")
+        opacity_control = QWidget(opacity_menu)
+        opacity_layout = QHBoxLayout(opacity_control)
+        opacity_layout.setContentsMargins(12, 7, 12, 7)
+        opacity_layout.setSpacing(10)
+        self.opacity_slider = QSlider(Qt.Orientation.Horizontal, opacity_control)
+        self.opacity_slider.setObjectName("opacitySlider")
+        self.opacity_slider.setRange(30, 100)
+        self.opacity_slider.setSingleStep(5)
+        self.opacity_slider.setPageStep(10)
+        self.opacity_slider.setValue(100)
+        self.opacity_slider.setMinimumWidth(150)
+        self.opacity_slider.setToolTip("Set the opacity of WType's background surfaces")
+        self.opacity_value = QLabel("100%", opacity_control)
+        self.opacity_value.setObjectName("opacityValue")
+        self.opacity_value.setMinimumWidth(38)
+        opacity_layout.addWidget(self.opacity_slider, 1)
+        opacity_layout.addWidget(self.opacity_value)
+        opacity_action = QWidgetAction(self)
+        opacity_action.setDefaultWidget(opacity_control)
+        opacity_menu.addAction(opacity_action)
+        self.opacity_slider.valueChanged.connect(self.set_background_opacity)
+
+        self.blur_action = QAction("Background Blur", self, checkable=True)
+        self.blur_action.setToolTip("Request blur through ext-background-effect-v1")
+        self.blur_action.setStatusTip(
+            "Request background blur from Niri or another supported Wayland compositor"
+        )
+        self.blur_action.toggled.connect(self.set_blur_enabled)
+        view_menu.addAction(self.blur_action)
+
         help_menu = menu_bar.addMenu("&Help")
         self._add_actions(help_menu, "help.shortcuts")
 
@@ -230,10 +271,6 @@ class MainWindow(QMainWindow):
         toolbar.setContextMenuPolicy(Qt.ContextMenuPolicy.PreventContextMenu)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
 
-        brand_mark = QLabel("W", toolbar)
-        brand_mark.setObjectName("brandMark")
-        brand_mark.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        toolbar.addWidget(brand_mark)
         brand_label = QLabel("WType", toolbar)
         brand_label.setObjectName("brandLabel")
         toolbar.addWidget(brand_label)
@@ -611,20 +648,79 @@ class MainWindow(QMainWindow):
         geometry = self.settings.value("window/geometry")
         if geometry is not None:
             self.restoreGeometry(geometry)
+        opacity_value = self.settings.value("appearance/background_opacity", 100, type=int)
+        opacity = opacity_value if isinstance(opacity_value, int) else 100
+        self.background_opacity = max(30, min(100, opacity))
+        previous = self.opacity_slider.blockSignals(True)
+        self.opacity_slider.setValue(self.background_opacity)
+        self.opacity_slider.blockSignals(previous)
+        self.opacity_value.setText(f"{self.background_opacity}%")
+
         preference = self.settings.value("appearance/theme", "system", type=str)
         if preference not in {key for key, _label in THEME_CHOICES}:
             preference = "system"
         self.set_theme(preference)
 
+        self.blur_enabled = bool(
+            self.settings.value("appearance/background_blur", False, type=bool)
+        )
+        previous = self.blur_action.blockSignals(True)
+        self.blur_action.setChecked(self.blur_enabled)
+        self.blur_action.blockSignals(previous)
+        self.background_effect.set_enabled(self.blur_enabled)
+
     def set_theme(self, preference: str) -> None:
         app = QApplication.instance()
         if not isinstance(app, QApplication):
             return
-        effective = apply_theme(app, preference)
+        self.theme_preference = preference
+        is_wayland = app.platformName().lower() == "wayland"
+        surface_opacity = self.background_opacity / 100 if is_wayland else 1.0
+        self.setWindowOpacity(1.0 if is_wayland else self.background_opacity / 100)
+        effective = apply_theme(app, preference, surface_opacity)
         self.editor.set_heading_color(THEMES[effective].accent)
         self.settings.setValue("appearance/theme", preference)
         for value, action in self.theme_actions.items():
             action.setChecked(value == preference)
+
+    def set_background_opacity(self, opacity: int) -> None:
+        self.background_opacity = max(30, min(100, opacity))
+        self.opacity_value.setText(f"{self.background_opacity}%")
+        if self.opacity_slider.value() != self.background_opacity:
+            previous = self.opacity_slider.blockSignals(True)
+            self.opacity_slider.setValue(self.background_opacity)
+            self.opacity_slider.blockSignals(previous)
+        self.settings.setValue("appearance/background_opacity", self.background_opacity)
+        self.set_theme(self.theme_preference)
+
+    def set_blur_enabled(self, enabled: bool) -> None:
+        self.blur_enabled = enabled
+        if self.blur_action.isChecked() != enabled:
+            previous = self.blur_action.blockSignals(True)
+            self.blur_action.setChecked(enabled)
+            self.blur_action.blockSignals(previous)
+        self.settings.setValue("appearance/background_blur", enabled)
+        applied = self.background_effect.set_enabled(enabled)
+        if enabled and self.background_effect.available and applied:
+            self.statusBar().showMessage("Background blur enabled", 3000)
+        elif enabled and self.isVisible():
+            self.statusBar().showMessage(
+                self.background_effect.error or "Blur will be requested when the window is ready",
+                5000,
+            )
+
+    def _initialize_background_effect(self) -> None:
+        available = self.background_effect.initialize()
+        if available:
+            self.blur_action.setStatusTip(
+                "Background blur is supported by this Wayland compositor"
+            )
+            if self.blur_enabled:
+                self.statusBar().showMessage("Background blur enabled", 3000)
+        else:
+            self.blur_action.setStatusTip(self.background_effect.error)
+            if self.blur_enabled:
+                self.statusBar().showMessage(self.background_effect.error, 5000)
 
     def _show_error(self, title: str, detail: str) -> None:
         QMessageBox.critical(self, title, detail)
@@ -636,4 +732,5 @@ class MainWindow(QMainWindow):
         self.recovery_timer.stop()
         self.recovery_service.remove(self.session.document_id)
         self.settings.setValue("window/geometry", self.saveGeometry())
+        self.background_effect.close()
         event.accept()

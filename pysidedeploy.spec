@@ -33,7 +33,7 @@ plugins =
 
 macos.permissions =
 mode = onefile
-extra_args = --quiet --noinclude-qt-translations --assume-yes-for-downloads
+extra_args = --quiet --noinclude-qt-translations --assume-yes-for-downloads --include-data-dir=src/wtype/assets=wtype/assets
 
 [buildozer]
 

@@ -17,8 +17,16 @@ and exports searchable PDFs.
   Persian/Arabic writing.
 - Direct A4 PDF export with selectable text.
 - Distinct, readable typography for all six Markdown heading levels.
+- Bundled Outfit typography across the interface and writing canvas.
 - System, WType Light/Dark, Tokyo Night, Catppuccin, Everforest, Nord,
   Gruvbox, Equilibrium, Solarized, and Adapta themes.
+- Adjustable background opacity and optional Wayland blur using the
+  `ext-background-effect-v1` protocol supported by Niri.
+
+Opacity and blur are available under **View**. Blur is requested directly from
+the compositor and works when it advertises `ext-background-effect-v1`; on
+other platforms the setting is safely ignored. Lower the background opacity to
+make the compositor effect visible.
 
 ## Download
 
@@ -116,3 +124,8 @@ Copyright © 2026 WType contributors.
 
 WType is free software distributed under the GNU General Public License,
 version 3 only. See [LICENSE](LICENSE) for the full terms.
+
+The bundled Outfit font is copyright © 2021 The Outfit Project Authors and is
+distributed under the SIL Open Font License 1.1. See
+`src/wtype/assets/OFL-Outfit.txt` in the source tree or `OUTFIT-LICENSE.txt` in
+a release archive for its terms.

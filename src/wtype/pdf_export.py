@@ -25,6 +25,7 @@ class PdfExporter:
     """Render Markdown into a clean, searchable A4 PDF."""
 
     EDITOR_FONTS = (
+        "Outfit",
         "Vazirmatn",
         "Noto Sans Arabic",
         "Noto Naskh Arabic",
@@ -34,6 +35,7 @@ class PdfExporter:
     # Some variable Arabic fonts render correctly but produce unreliable PDF
     # Unicode maps in Qt. Prefer fixed desktop fonts with stable text extraction.
     PDF_FONTS = (
+        "Outfit",
         "DejaVu Sans",
         "Arial",
         "Segoe UI",

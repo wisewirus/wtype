@@ -102,6 +102,7 @@ jobs:
           mkdir -p package/WType release
           install -m 0755 dist/WType.bin package/WType/WType
           cp LICENSE README.md package/WType/
+          cp src/wtype/assets/OFL-Outfit.txt package/WType/OUTFIT-LICENSE.txt
           tar -C package -czf "release/WType-$version-linux-${{ matrix.arch }}.tar.gz" WType
       - name: Package Windows application
         if: matrix.platform == 'windows'
@@ -111,6 +112,7 @@ jobs:
           New-Item -ItemType Directory -Force package/WType, release
           Copy-Item dist/WType.exe package/WType/WType.exe
           Copy-Item LICENSE, README.md package/WType/
+          Copy-Item src/wtype/assets/OFL-Outfit.txt package/WType/OUTFIT-LICENSE.txt
           Compress-Archive -Path package/WType -DestinationPath "release/WType-$version-windows-${{ matrix.arch }}.zip"
       - name: Package macOS application
         if: matrix.platform == 'macos'
@@ -120,6 +122,7 @@ jobs:
           mkdir -p package/WType release
           cp -R dist/WType.app package/WType/
           cp LICENSE README.md package/WType/
+          cp src/wtype/assets/OFL-Outfit.txt package/WType/OUTFIT-LICENSE.txt
           ditto -c -k --sequesterRsrc --keepParent package/WType \
             "release/WType-$version-macos-${{ matrix.arch }}.zip"
       - uses: actions/upload-artifact@v7

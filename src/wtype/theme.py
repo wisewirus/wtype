@@ -245,20 +245,34 @@ def _build_palette(theme: Theme) -> QPalette:
     return palette
 
 
-def _build_stylesheet(theme: Theme) -> str:
+def _with_opacity(color: str, opacity: float) -> str:
+    opacity = max(0.0, min(1.0, opacity))
+    if opacity >= 0.999:
+        return color
+    value = QColor(color)
+    return f"rgba({value.red()}, {value.green()}, {value.blue()}, {round(opacity * 255)})"
+
+
+def _build_stylesheet(theme: Theme, background_opacity: float = 1.0) -> str:
     accent_text = "#ffffff" if not theme.dark else theme.editor
+    window_background = _with_opacity(theme.window, background_opacity)
+    surface_background = _with_opacity(theme.surface, background_opacity)
+    elevated_background = _with_opacity(theme.elevated, background_opacity)
+    editor_background = _with_opacity(theme.editor, background_opacity)
+    editor_border = "#737780" if theme.dark else "#a5a9b1"
     return f"""
 QMainWindow {{
-    background: {theme.window};
+    background: transparent;
 }}
 QWidget {{
     color: {theme.text};
+    font-family: "Outfit";
 }}
 QWidget#editorShell {{
-    background: {theme.window};
+    background: {window_background};
 }}
 QMenuBar {{
-    background: {theme.surface};
+    background: {surface_background};
     color: {theme.text};
     border: 0;
     border-bottom: 1px solid {theme.border};
@@ -271,10 +285,10 @@ QMenuBar::item {{
     padding: 6px 10px;
 }}
 QMenuBar::item:selected {{
-    background: {theme.elevated};
+    background: {elevated_background};
 }}
 QMenu {{
-    background: {theme.elevated};
+    background: {elevated_background};
     color: {theme.text};
     border: 1px solid {theme.border};
     border-radius: 9px;
@@ -298,7 +312,7 @@ QMenu::separator {{
     margin: 5px 8px;
 }}
 QToolBar {{
-    background: {theme.surface};
+    background: {surface_background};
     border: 0;
     border-bottom: 1px solid {theme.border};
     spacing: 4px;
@@ -318,7 +332,7 @@ QToolButton {{
     font-size: 13px;
 }}
 QToolButton:hover {{
-    background: {theme.elevated};
+    background: {elevated_background};
     border-color: {theme.border};
 }}
 QToolButton:pressed, QToolButton:checked {{
@@ -329,43 +343,32 @@ QToolButton:pressed, QToolButton:checked {{
 QToolButton:disabled {{
     color: {theme.muted};
 }}
-QLabel#brandMark {{
-    background: {theme.accent};
-    color: {accent_text};
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 700;
-    min-width: 30px;
-    min-height: 30px;
-    max-width: 30px;
-    max-height: 30px;
-}}
 QLabel#brandLabel {{
     color: {theme.text};
     font-size: 15px;
     font-weight: 700;
-    padding: 0 5px 0 3px;
+    padding: 0 7px 0 2px;
 }}
 QTextEdit#editor {{
-    background: {theme.editor};
+    background: {editor_background};
     color: {theme.text};
-    border: 1px solid {theme.border};
-    border-radius: 12px;
+    border: 1px solid {editor_border};
+    border-radius: 0;
     padding: 42px 54px;
     font-size: 12pt;
     selection-background-color: {theme.selection};
     selection-color: {theme.selected_text};
 }}
 QTextEdit#editor:focus {{
-    border-color: {theme.accent};
+    border-color: {editor_border};
 }}
 QWidget#findBar {{
-    background: {theme.surface};
+    background: {surface_background};
     border: 1px solid {theme.border};
     border-radius: 10px;
 }}
 QLineEdit {{
-    background: {theme.editor};
+    background: {editor_background};
     color: {theme.text};
     border: 1px solid {theme.border};
     border-radius: 7px;
@@ -378,7 +381,7 @@ QLineEdit:focus {{
     border-color: {theme.accent};
 }}
 QPushButton {{
-    background: {theme.elevated};
+    background: {elevated_background};
     color: {theme.text};
     border: 1px solid {theme.border};
     border-radius: 7px;
@@ -394,7 +397,7 @@ QPushButton:pressed {{
     background: {theme.accent};
 }}
 QStatusBar {{
-    background: {theme.surface};
+    background: {surface_background};
     color: {theme.muted};
     border-top: 1px solid {theme.border};
     padding: 3px 10px;
@@ -421,16 +424,37 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
     border: 0;
 }}
 QToolTip {{
-    background: {theme.elevated};
+    background: {elevated_background};
     color: {theme.text};
     border: 1px solid {theme.border};
     padding: 5px;
 }}
+QSlider#opacitySlider::groove:horizontal {{
+    background: {theme.border};
+    border: 0;
+    border-radius: 2px;
+    height: 4px;
+}}
+QSlider#opacitySlider::sub-page:horizontal {{
+    background: {theme.accent};
+    border-radius: 2px;
+}}
+QSlider#opacitySlider::handle:horizontal {{
+    background: {theme.text};
+    border: 2px solid {theme.accent};
+    border-radius: 7px;
+    height: 12px;
+    width: 12px;
+    margin: -5px 0;
+}}
+QLabel#opacityValue {{
+    color: {theme.muted};
+}}
 """
 
 
-def apply_theme(app: QApplication, preference: str) -> str:
+def apply_theme(app: QApplication, preference: str, background_opacity: float = 1.0) -> str:
     theme = resolve_theme(app, preference)
     app.setPalette(_build_palette(theme))
-    app.setStyleSheet(_build_stylesheet(theme))
+    app.setStyleSheet(_build_stylesheet(theme, background_opacity))
     return theme.key
