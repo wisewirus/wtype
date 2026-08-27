@@ -4,10 +4,13 @@ from pathlib import Path
 
 from PySide6.QtCore import QMarginsF, Qt
 from PySide6.QtGui import (
+    QColor,
     QFont,
     QFontDatabase,
     QPageLayout,
     QPageSize,
+    QTextBlock,
+    QTextCharFormat,
     QTextCursor,
     QTextDocument,
     QTextFormat,
@@ -15,6 +18,8 @@ from PySide6.QtGui import (
     QTextTableFormat,
 )
 from PySide6.QtPrintSupport import QPrinter
+
+from wtype.typography import CODE_FONT_FAMILIES
 
 
 class PdfExportError(RuntimeError):
@@ -45,6 +50,7 @@ class PdfExporter:
         "Noto Naskh Arabic",
         "Noto Sans",
     )
+    CODE_FONTS = CODE_FONT_FAMILIES
 
     @classmethod
     def _preferred_font(cls, candidates: tuple[str, ...]) -> str:
@@ -58,6 +64,10 @@ class PdfExporter:
     @classmethod
     def preferred_pdf_font(cls) -> str:
         return cls._preferred_font(cls.PDF_FONTS)
+
+    @classmethod
+    def preferred_code_font(cls) -> str:
+        return cls._preferred_font(cls.CODE_FONTS)
 
     def export(self, markdown: str, destination: Path) -> None:
         destination = destination.expanduser().resolve()
@@ -95,23 +105,37 @@ class PdfExporter:
             QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
         )
 
+        code_font = QFont(self.preferred_code_font(), 10)
+        code_font.setFixedPitch(True)
+        code_background = QColor(128, 128, 128, 24)
         block = document.begin()
         while block.isValid():
             cursor = QTextCursor(block)
             block_format = block.blockFormat()
             block_format.setLayoutDirection(Qt.LayoutDirection.LayoutDirectionAuto)
             heading = block_format.headingLevel()
+            is_code_block = block_format.hasProperty(
+                QTextFormat.Property.BlockCodeFence
+            )
             if heading:
                 block_format.setTopMargin(18 if heading <= 2 else 12)
                 block_format.setBottomMargin(6)
                 block_format.setPageBreakPolicy(
                     QTextFormat.PageBreakFlag.PageBreak_Auto
                 )
-            elif block_format.hasProperty(QTextFormat.Property.BlockCodeFence):
-                block_format.setTopMargin(6)
-                block_format.setBottomMargin(8)
+            elif is_code_block:
+                previous = block.previous()
+                following = block.next()
+                block_format.setTopMargin(
+                    6 if not self._is_code_block(previous) else 0
+                )
+                block_format.setBottomMargin(
+                    8 if not self._is_code_block(following) else 0
+                )
                 block_format.setLeftMargin(10)
                 block_format.setRightMargin(10)
+                block_format.setTextIndent(8)
+                block_format.setBackground(code_background)
             elif block_format.intProperty(QTextFormat.Property.BlockQuoteLevel):
                 block_format.setLeftMargin(18)
                 block_format.setRightMargin(8)
@@ -120,10 +144,46 @@ class PdfExporter:
             else:
                 block_format.setBottomMargin(7)
             cursor.setBlockFormat(block_format)
+            if is_code_block:
+                cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+                code_format = QTextCharFormat()
+                code_format.setFont(code_font)
+                cursor.mergeCharFormat(code_format)
+            else:
+                self._style_inline_code(block, code_font, code_background)
             block = block.next()
 
         self._style_tables(document)
         return document
+
+    @staticmethod
+    def _is_code_block(block: QTextBlock) -> bool:
+        return block.isValid() and block.blockFormat().hasProperty(
+            QTextFormat.Property.BlockCodeFence
+        )
+
+    @staticmethod
+    def _style_inline_code(
+        block: QTextBlock,
+        code_font: QFont,
+        background: QColor,
+    ) -> None:
+        ranges: list[tuple[int, int]] = []
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            if fragment.isValid() and fragment.charFormat().fontFixedPitch():
+                ranges.append((fragment.position(), fragment.length()))
+            iterator += 1
+
+        for start, length in ranges:
+            cursor = QTextCursor(block.document())
+            cursor.setPosition(start)
+            cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+            code_format = QTextCharFormat()
+            code_format.setFont(code_font)
+            code_format.setBackground(background)
+            cursor.mergeCharFormat(code_format)
 
     @staticmethod
     def _style_tables(document: QTextDocument) -> None:

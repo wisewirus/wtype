@@ -679,6 +679,7 @@ class MainWindow(QMainWindow):
         self.setWindowOpacity(1.0 if is_wayland else self.background_opacity / 100)
         effective = apply_theme(app, preference, surface_opacity)
         self.editor.set_heading_color(THEMES[effective].accent)
+        self.editor.set_code_background(THEMES[effective].code_background)
         self.settings.setValue("appearance/theme", preference)
         for value, action in self.theme_actions.items():
             action.setChecked(value == preference)

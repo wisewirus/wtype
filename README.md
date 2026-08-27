@@ -22,6 +22,8 @@ and exports searchable PDFs.
   Gruvbox, Equilibrium, Solarized, and Adapta themes.
 - Adjustable background opacity and optional Wayland blur using the
   `ext-background-effect-v1` protocol supported by Niri.
+- Cascadia Mono code typography with subtle, theme-aware translucent gray
+  backgrounds for inline code and fenced code blocks.
 
 Opacity and blur are available under **View**. Blur is requested directly from
 the compositor and works when it advertises `ext-background-effect-v1`; on
@@ -129,3 +131,8 @@ The bundled Outfit font is copyright © 2021 The Outfit Project Authors and is
 distributed under the SIL Open Font License 1.1. See
 `src/wtype/assets/OFL-Outfit.txt` in the source tree or `OUTFIT-LICENSE.txt` in
 a release archive for its terms.
+
+The bundled Cascadia Mono font is copyright © Microsoft Corporation and is
+distributed under the SIL Open Font License 1.1. See
+`src/wtype/assets/OFL-Cascadia.txt` in the source tree or
+`CASCADIA-MONO-LICENSE.txt` in a release archive for its terms.

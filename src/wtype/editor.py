@@ -19,9 +19,11 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QInputDialog, QTextEdit, QWidget
 
+from wtype.typography import CODE_FONT_FAMILIES
 
-class HeadingHighlighter(QSyntaxHighlighter):
-    """Adds view-only heading typography without changing serialized Markdown."""
+
+class MarkdownHighlighter(QSyntaxHighlighter):
+    """Adds view-only heading and code typography without changing Markdown."""
 
     _SCALE = (2.0, 1.67, 1.42, 1.25, 1.12, 1.04)
 
@@ -29,6 +31,7 @@ class HeadingHighlighter(QSyntaxHighlighter):
         super().__init__(document)
         self._base_size = base_size
         self._color: QColor | None = None
+        self._code_background = QColor(128, 128, 128, 28)
 
     def point_size(self, level: int) -> float:
         if not 1 <= level <= len(self._SCALE):
@@ -43,18 +46,47 @@ class HeadingHighlighter(QSyntaxHighlighter):
         self._color = QColor(color)
         self.rehighlight()
 
-    def highlightBlock(self, text: str) -> None:  # noqa: N802 (Qt override)
-        level = self.currentBlock().blockFormat().headingLevel()
-        if not 1 <= level <= len(self._SCALE):
-            return
+    def set_code_background(self, color: QColor) -> None:
+        self._code_background = QColor(color)
+        self.rehighlight()
+
+    @staticmethod
+    def _code_font_format() -> QTextCharFormat:
         char_format = QTextCharFormat()
-        char_format.setFontPointSize(self.point_size(level))
-        char_format.setFontWeight(
-            QFont.Weight.Bold if level <= 2 else QFont.Weight.DemiBold
-        )
-        if self._color is not None:
-            char_format.setForeground(self._color)
-        self.setFormat(0, len(text), char_format)
+        char_format.setFontFixedPitch(True)
+        char_format.setFontFamilies(list(CODE_FONT_FAMILIES))
+        return char_format
+
+    def highlightBlock(self, text: str) -> None:  # noqa: N802 (Qt override)
+        block = self.currentBlock()
+        block_format = block.blockFormat()
+        if block_format.hasProperty(QTextFormat.Property.BlockCodeFence):
+            self.setFormat(0, len(text), self._code_font_format())
+            return
+
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            if fragment.isValid() and fragment.charFormat().fontFixedPitch():
+                code_format = self._code_font_format()
+                code_format.setBackground(self._code_background)
+                self.setFormat(
+                    fragment.position() - block.position(),
+                    fragment.length(),
+                    code_format,
+                )
+            iterator += 1
+
+        level = block_format.headingLevel()
+        if 1 <= level <= len(self._SCALE):
+            heading_format = QTextCharFormat()
+            heading_format.setFontPointSize(self.point_size(level))
+            heading_format.setFontWeight(
+                QFont.Weight.Bold if level <= 2 else QFont.Weight.DemiBold
+            )
+            if self._color is not None:
+                heading_format.setForeground(self._color)
+            self.setFormat(0, len(text), heading_format)
 
 
 class MarkdownEditor(QTextEdit):
@@ -84,7 +116,8 @@ class MarkdownEditor(QTextEdit):
         option = self.document().defaultTextOption()
         option.setTextDirection(Qt.LayoutDirection.LayoutDirectionAuto)
         self.document().setDefaultTextOption(option)
-        self._heading_highlighter = HeadingHighlighter(
+        self._code_background = QColor(128, 128, 128, 28)
+        self._markdown_highlighter = MarkdownHighlighter(
             self.document(),
             max(self.font().pointSizeF(), 1.0),
         )
@@ -96,13 +129,18 @@ class MarkdownEditor(QTextEdit):
     def configure_typography(self, font: QFont) -> None:
         self.setFont(font)
         self.document().setDefaultFont(font)
-        self._heading_highlighter.set_base_size(max(font.pointSizeF(), 1.0))
+        self._markdown_highlighter.set_base_size(max(font.pointSizeF(), 1.0))
 
     def set_heading_color(self, color: str) -> None:
-        self._heading_highlighter.set_color(color)
+        self._markdown_highlighter.set_color(color)
+
+    def set_code_background(self, color: QColor) -> None:
+        self._code_background = QColor(color)
+        self._markdown_highlighter.set_code_background(color)
+        self._refresh_code_block_backgrounds()
 
     def heading_point_size(self, level: int) -> float:
-        return self._heading_highlighter.point_size(level)
+        return self._markdown_highlighter.point_size(level)
 
     def set_markdown(self, markdown: str) -> None:
         self._loading = True
@@ -118,7 +156,8 @@ class MarkdownEditor(QTextEdit):
             self.setTextCursor(cursor)
         finally:
             self._loading = False
-        self._heading_highlighter.rehighlight()
+        self._markdown_highlighter.rehighlight()
+        self._refresh_code_block_backgrounds()
         self._on_cursor_changed()
 
     def markdown(self) -> str:
@@ -127,8 +166,25 @@ class MarkdownEditor(QTextEdit):
         )
 
     def _on_text_changed(self) -> None:
+        self._refresh_code_block_backgrounds()
         if not self._loading:
             self.markdown_changed.emit(self.markdown())
+
+    def _refresh_code_block_backgrounds(self) -> None:
+        selections: list[QTextEdit.ExtraSelection] = []
+        block = self.document().begin()
+        while block.isValid():
+            if block.blockFormat().hasProperty(QTextFormat.Property.BlockCodeFence):
+                selection = QTextEdit.ExtraSelection()
+                selection.cursor = QTextCursor(block)
+                selection.format.setBackground(self._code_background)
+                selection.format.setProperty(
+                    QTextFormat.Property.FullWidthSelection,
+                    True,
+                )
+                selections.append(selection)
+            block = block.next()
+        self.setExtraSelections(selections)
 
     def _on_cursor_changed(self) -> None:
         self.format_state_changed.emit()
@@ -159,7 +215,7 @@ class MarkdownEditor(QTextEdit):
         char_format = QTextCharFormat()
         char_format.setFontFixedPitch(not current)
         if not current:
-            char_format.setFontFamilies(["JetBrains Mono", "Noto Sans Mono", "monospace"])
+            char_format.setFontFamilies(list(CODE_FONT_FAMILIES))
         else:
             char_format.clearProperty(QTextFormat.Property.FontFamilies)
         self._merge_character_format(char_format)
@@ -212,7 +268,8 @@ class MarkdownEditor(QTextEdit):
         cursor.setBlockFormat(block_format)
         cursor.endEditBlock()
         self.setTextCursor(cursor)
-        self._heading_highlighter.rehighlight()
+        self._markdown_highlighter.rehighlight()
+        self._refresh_code_block_backgrounds()
         self.format_state_changed.emit()
 
     def set_paragraph(self) -> None:
@@ -223,7 +280,8 @@ class MarkdownEditor(QTextEdit):
         block_format.clearProperty(QTextFormat.Property.BlockCodeLanguage)
         block_format.clearProperty(QTextFormat.Property.BlockQuoteLevel)
         cursor.setBlockFormat(block_format)
-        self._heading_highlighter.rehighlight()
+        self._markdown_highlighter.rehighlightBlock(cursor.block())
+        self._refresh_code_block_backgrounds()
         self.format_state_changed.emit()
 
     def toggle_bullet_list(self) -> None:
@@ -274,6 +332,8 @@ class MarkdownEditor(QTextEdit):
             block_format.setProperty(QTextFormat.Property.BlockCodeFence, "```")
             block_format.setProperty(QTextFormat.Property.BlockCodeLanguage, "")
         cursor.setBlockFormat(block_format)
+        self._markdown_highlighter.rehighlightBlock(cursor.block())
+        self._refresh_code_block_backgrounds()
         self.format_state_changed.emit()
 
     def insert_horizontal_rule(self) -> None:
@@ -488,9 +548,7 @@ class MarkdownEditor(QTextEdit):
                 char_format.setFontStrikeOut(True)
             else:
                 char_format.setFontFixedPitch(True)
-                char_format.setFontFamilies(
-                    ["JetBrains Mono", "Noto Sans Mono", "monospace"]
-                )
+                char_format.setFontFamilies(list(CODE_FONT_FAMILIES))
             replacement.mergeCharFormat(char_format)
             replacement.clearSelection()
             replacement.setPosition(start + len(inner))
@@ -511,6 +569,8 @@ class MarkdownEditor(QTextEdit):
         cursor.setBlockFormat(block_format)
         cursor.endEditBlock()
         self.setTextCursor(cursor)
+        self._markdown_highlighter.rehighlightBlock(cursor.block())
+        self._refresh_code_block_backgrounds()
         self._input_rule_just_applied = True
 
     def _convert_marker_to_horizontal_rule(self) -> None:

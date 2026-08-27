@@ -3,9 +3,10 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtGui import QColor, QFont, QTextCursor, QTextFormat
 
 from wtype.editor import MarkdownEditor
+from wtype.typography import CODE_FONT_FAMILY
 
 
 def test_heading_two_command_serializes_to_markdown(qtbot) -> None:  # type: ignore[no-untyped-def]
@@ -114,6 +115,38 @@ def test_code_fence_input_rule(qtbot) -> None:  # type: ignore[no-untyped-def]
     qtbot.keyClicks(editor, "print('fast')")
 
     assert "```\nprint('fast')\n```" in editor.markdown()
+
+
+def test_code_uses_cascadia_mono_and_translucent_rectangles(
+    qtbot, qapp
+) -> None:  # type: ignore[no-untyped-def]
+    editor = MarkdownEditor()
+    qtbot.addWidget(editor)
+    background = QColor(96, 96, 96, 32)
+    editor.set_code_background(background)
+    editor.set_markdown("Plain `inline` text\n\n```python\nprint('fast')\n```\n")
+    qapp.processEvents()
+
+    inline_formats = editor.document().begin().layout().formats()
+    assert any(
+        CODE_FONT_FAMILY in item.format.fontFamilies()
+        and item.format.background().color() == background
+        for item in inline_formats
+    )
+
+    code_block = editor.document().begin().next()
+    block_formats = code_block.layout().formats()
+    assert any(CODE_FONT_FAMILY in item.format.fontFamilies() for item in block_formats)
+
+    selections = editor.extraSelections()
+    assert len(selections) == 1
+    assert selections[0].format.boolProperty(
+        QTextFormat.Property.FullWidthSelection
+    )
+    assert selections[0].format.background().color() == background
+    assert selections[0].format.background().color().alpha() < 255
+    assert "`inline`" in editor.markdown()
+    assert "```python\nprint('fast')\n```" in editor.markdown()
 
 
 def test_insert_table_and_tab_at_last_cell_adds_row(qtbot) -> None:  # type: ignore[no-untyped-def]

@@ -6,6 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
+from wtype.typography import BODY_FONT_FAMILY
+
 
 @dataclass(frozen=True, slots=True)
 class Theme:
@@ -23,6 +25,12 @@ class Theme:
     accent_hover: str
     selection: str
     selected_text: str
+
+    @property
+    def code_background(self) -> QColor:
+        if self.dark:
+            return QColor(192, 192, 192, 28)
+        return QColor(64, 64, 64, 20)
 
 
 THEMES: dict[str, Theme] = {
@@ -266,7 +274,7 @@ QMainWindow {{
 }}
 QWidget {{
     color: {theme.text};
-    font-family: "Outfit";
+    font-family: "{BODY_FONT_FAMILY}";
 }}
 QWidget#editorShell {{
     background: {window_background};

@@ -40,3 +40,10 @@ def test_translucent_theme_uses_outfit_and_rectangular_neutral_editor(qapp) -> N
     assert "background: rgba(" in stylesheet
     assert "border-radius: 0;" in stylesheet
     assert "QTextEdit#editor:focus {\n    border-color: #737780;" in stylesheet
+
+
+def test_code_backgrounds_are_translucent_neutral_grays() -> None:
+    for theme in THEMES.values():
+        color = theme.code_background
+        assert color.red() == color.green() == color.blue()
+        assert 0 < color.alpha() < 255
