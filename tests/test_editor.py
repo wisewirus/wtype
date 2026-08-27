@@ -6,7 +6,27 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QTextCursor, QTextFormat
 
 from wtype.editor import MarkdownEditor
-from wtype.typography import CODE_FONT_FAMILY
+from wtype.typography import BODY_FONT_FAMILY, CODE_FONT_FAMILY
+
+
+def test_plain_text_stays_proportional_with_monospace_application_font(
+    qtbot, qapp
+) -> None:  # type: ignore[no-untyped-def]
+    original_font = QFont(qapp.font())
+    fixed_font = QFont(CODE_FONT_FAMILY, 10)
+    fixed_font.setFixedPitch(True)
+    qapp.setFont(fixed_font)
+
+    try:
+        editor = MarkdownEditor()
+        qtbot.addWidget(editor)
+        editor.set_markdown("Plain text")
+
+        assert editor.document().defaultFont().families()[0] == BODY_FONT_FAMILY
+        assert not editor.document().defaultFont().fixedPitch()
+        assert editor.markdown().lstrip().startswith("Plain text")
+    finally:
+        qapp.setFont(original_font)
 
 
 def test_heading_two_command_serializes_to_markdown(qtbot) -> None:  # type: ignore[no-untyped-def]

@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
-from wtype.typography import BODY_FONT_FAMILY
+from wtype.typography import BODY_FONT_FAMILIES
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,13 +268,14 @@ def _build_stylesheet(theme: Theme, background_opacity: float = 1.0) -> str:
     elevated_background = _with_opacity(theme.elevated, background_opacity)
     editor_background = _with_opacity(theme.editor, background_opacity)
     editor_border = "#737780" if theme.dark else "#a5a9b1"
+    body_font_stack = ", ".join(f'"{family}"' for family in BODY_FONT_FAMILIES)
     return f"""
 QMainWindow {{
     background: transparent;
 }}
 QWidget {{
     color: {theme.text};
-    font-family: "{BODY_FONT_FAMILY}";
+    font-family: {body_font_stack};
 }}
 QWidget#editorShell {{
     background: {window_background};

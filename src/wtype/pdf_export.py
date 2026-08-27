@@ -19,7 +19,12 @@ from PySide6.QtGui import (
 )
 from PySide6.QtPrintSupport import QPrinter
 
-from wtype.typography import CODE_FONT_FAMILIES
+from wtype.typography import (
+    ARABIC_FONT_FAMILY,
+    BODY_FONT_FAMILIES,
+    BODY_FONT_FAMILY,
+    CODE_FONT_FAMILIES,
+)
 
 
 class PdfExportError(RuntimeError):
@@ -29,27 +34,20 @@ class PdfExportError(RuntimeError):
 class PdfExporter:
     """Render Markdown into a clean, searchable A4 PDF."""
 
-    EDITOR_FONTS = (
-        "Outfit",
-        "Vazirmatn",
-        "Noto Sans Arabic",
-        "Noto Naskh Arabic",
-        "Noto Sans",
-        "DejaVu Sans",
-    )
+    EDITOR_FONTS = BODY_FONT_FAMILIES
     # Use one font with native Arabic coverage so Qt does not mix a Latin-only
     # base font with platform fallback glyphs. Mixed-font fallback can produce
     # invalid ToUnicode maps in PDFs, particularly through CoreText on macOS.
     PDF_FONTS = (
+        ARABIC_FONT_FAMILY,
         "DejaVu Sans",
         "Arial",
         "Segoe UI",
         "Geeza Pro",
         "Noto Sans Arabic",
         "Noto Naskh Arabic",
-        "Vazirmatn",
         "Noto Sans",
-        "Outfit",
+        BODY_FONT_FAMILY,
     )
     CODE_FONTS = CODE_FONT_FAMILIES
 

@@ -17,7 +17,8 @@ and exports searchable PDFs.
   Persian/Arabic writing.
 - Direct A4 PDF export with selectable text.
 - Distinct, readable typography for all six Markdown heading levels.
-- Bundled Outfit typography across the interface and writing canvas.
+- Bundled Outfit typography for Latin text and Vazirmatn typography for
+  Persian and Arabic across the interface, writing canvas, and PDF export.
 - System, WType Light/Dark, Tokyo Night, Catppuccin, Everforest, Nord,
   Gruvbox, Equilibrium, Solarized, and Adapta themes.
 - Adjustable background opacity and optional Wayland blur using the
@@ -131,6 +132,11 @@ The bundled Outfit font is copyright © 2021 The Outfit Project Authors and is
 distributed under the SIL Open Font License 1.1. See
 `src/wtype/assets/OFL-Outfit.txt` in the source tree or `OUTFIT-LICENSE.txt` in
 a release archive for its terms.
+
+The bundled Vazirmatn font is copyright © 2015 The Vazirmatn Project Authors
+and is distributed under the SIL Open Font License 1.1. See
+`src/wtype/assets/OFL-Vazirmatn.txt` in the source tree or
+`VAZIRMATN-LICENSE.txt` in a release archive for its terms.
 
 The bundled Cascadia Mono font is copyright © Microsoft Corporation and is
 distributed under the SIL Open Font License 1.1. See

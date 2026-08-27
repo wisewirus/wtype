@@ -19,7 +19,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QInputDialog, QTextEdit, QWidget
 
-from wtype.typography import CODE_FONT_FAMILIES
+from wtype.typography import BODY_FONT_FAMILIES, CODE_FONT_FAMILIES
 
 
 class MarkdownHighlighter(QSyntaxHighlighter):
@@ -113,6 +113,9 @@ class MarkdownEditor(QTextEdit):
         self.setPlaceholderText("Start writing…")
         self.setFrameShape(QTextEdit.Shape.NoFrame)
 
+        editor_font = self._body_font(self.font())
+        self.setFont(editor_font)
+        self.document().setDefaultFont(editor_font)
         option = self.document().defaultTextOption()
         option.setTextDirection(Qt.LayoutDirection.LayoutDirectionAuto)
         self.document().setDefaultTextOption(option)
@@ -127,9 +130,19 @@ class MarkdownEditor(QTextEdit):
         self.selectionChanged.connect(self.format_state_changed)
 
     def configure_typography(self, font: QFont) -> None:
-        self.setFont(font)
-        self.document().setDefaultFont(font)
-        self._markdown_highlighter.set_base_size(max(font.pointSizeF(), 1.0))
+        editor_font = self._body_font(font)
+        self.setFont(editor_font)
+        self.document().setDefaultFont(editor_font)
+        self._markdown_highlighter.set_base_size(
+            max(editor_font.pointSizeF(), 1.0)
+        )
+
+    @staticmethod
+    def _body_font(font: QFont) -> QFont:
+        body_font = QFont(font)
+        body_font.setFamilies(list(BODY_FONT_FAMILIES))
+        body_font.setFixedPitch(False)
+        return body_font
 
     def set_heading_color(self, color: str) -> None:
         self._markdown_highlighter.set_color(color)

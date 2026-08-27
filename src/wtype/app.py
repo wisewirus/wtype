@@ -8,7 +8,11 @@ from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
 from wtype.main_window import MainWindow
-from wtype.typography import BODY_FONT_FAMILY, BUNDLED_FONT_FILES
+from wtype.typography import (
+    BODY_FONT_FAMILIES,
+    BODY_FONT_FAMILY,
+    BUNDLED_FONT_FILES,
+)
 
 
 def _load_bundled_fonts() -> str:
@@ -34,7 +38,10 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication(arguments)
     app.setAttribute(Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)
     app.setApplicationDisplayName("WType")
-    app.setFont(QFont(_load_bundled_fonts(), 10))
+    application_font = QFont(_load_bundled_fonts(), 10)
+    application_font.setFamilies(list(BODY_FONT_FAMILIES))
+    application_font.setFixedPitch(False)
+    app.setFont(application_font)
 
     initial_path = None
     if len(arguments) > 1 and not arguments[1].startswith("-"):

@@ -9,7 +9,7 @@ from PySide6.QtPdf import QPdfDocument
 
 from wtype.app import _load_bundled_fonts
 from wtype.pdf_export import PdfExporter
-from wtype.typography import CODE_FONT_FAMILY
+from wtype.typography import ARABIC_FONT_FAMILY, CODE_FONT_FAMILY
 
 
 def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
@@ -17,6 +17,7 @@ def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # t
     destination = tmp_path / "document.pdf"
 
     pdf_font = PdfExporter.preferred_pdf_font()
+    assert pdf_font == ARABIC_FONT_FAMILY
     assert QFontDatabase.WritingSystem.Arabic in QFontDatabase.writingSystems(
         pdf_font
     ), pdf_font
