@@ -28,10 +28,12 @@ class _WindowsBlur:
     """Native Windows backdrop, with a composition blur fallback."""
 
     _DWMWA_SYSTEMBACKDROP_TYPE = 38
+    _DWMWA_REDIRECTIONBITMAP_ALPHA = 39
     _DWMSBT_NONE = 1
     _DWMSBT_TRANSIENTWINDOW = 3
     _WCA_ACCENT_POLICY = 19
     _ACCENT_DISABLED = 0
+    _ACCENT_ENABLE_TRANSPARENTGRADIENT = 2
     _ACCENT_ENABLE_BLURBEHIND = 3
 
     def __init__(
@@ -73,14 +75,20 @@ class _WindowsBlur:
 
     def connect(self) -> bool:
         # Desktop Acrylic through the documented API is available on current
-        # Windows 11 releases. Setting NONE is also a side-effect-free probe.
-        if self._set_system_backdrop(self._DWMSBT_NONE):
+        # Windows 11 releases. The redirection bitmap alpha attribute is needed
+        # for DWM to composite Qt's premultiplied-alpha backing store over the
+        # backdrop instead of treating its darkened RGB values as opaque.
+        if self._set_system_backdrop(self._DWMSBT_NONE) and self._set_redirection_bitmap_alpha(
+            True
+        ):
             self._mode = "system_backdrop"
             return True
 
         # Windows 10 and early Windows 11 builds expose the older composition
         # accent API instead. It has no import library, so it is loaded at run time.
-        if self._set_accent(self._ACCENT_DISABLED):
+        if self._set_accent(self._ACCENT_DISABLED) and self._set_accent(
+            self._ACCENT_ENABLE_TRANSPARENTGRADIENT
+        ):
             self._mode = "accent"
             return True
         return False
@@ -90,20 +98,37 @@ class _WindowsBlur:
             backdrop = self._DWMSBT_TRANSIENTWINDOW if enabled else self._DWMSBT_NONE
             return self._set_system_backdrop(backdrop)
         if self._mode == "accent":
-            accent = self._ACCENT_ENABLE_BLURBEHIND if enabled else self._ACCENT_DISABLED
+            accent = (
+                self._ACCENT_ENABLE_BLURBEHIND
+                if enabled
+                else self._ACCENT_ENABLE_TRANSPARENTGRADIENT
+            )
             return self._set_accent(accent)
         return False
 
     def close(self) -> None:
-        if self._mode:
-            self.set_enabled(False)
-            self._mode = ""
+        if self._mode == "system_backdrop":
+            self._set_system_backdrop(self._DWMSBT_NONE)
+            self._set_redirection_bitmap_alpha(False)
+        elif self._mode == "accent":
+            self._set_accent(self._ACCENT_DISABLED)
+        self._mode = ""
 
     def _set_system_backdrop(self, backdrop: int) -> bool:
         value = ctypes.c_int(backdrop)
         result = self._dwm_set_window_attribute(
             ctypes.c_void_p(self._window_handle),
             ctypes.c_uint32(self._DWMWA_SYSTEMBACKDROP_TYPE),
+            ctypes.byref(value),
+            ctypes.c_uint32(ctypes.sizeof(value)),
+        )
+        return bool(result >= 0)
+
+    def _set_redirection_bitmap_alpha(self, enabled: bool) -> bool:
+        value = ctypes.c_int(enabled)
+        result = self._dwm_set_window_attribute(
+            ctypes.c_void_p(self._window_handle),
+            ctypes.c_uint32(self._DWMWA_REDIRECTIONBITMAP_ALPHA),
             ctypes.byref(value),
             ctypes.c_uint32(ctypes.sizeof(value)),
         )
