@@ -21,15 +21,16 @@ and exports searchable PDFs.
   Persian and Arabic across the interface, writing canvas, and PDF export.
 - System, WType Light/Dark, Tokyo Night, Catppuccin, Everforest, Nord,
   Gruvbox, Equilibrium, Solarized, and Adapta themes.
-- Adjustable background opacity and optional Wayland blur using the
-  `ext-background-effect-v1` protocol supported by Niri.
+- Adjustable background opacity and optional native blur using Windows Desktop
+  Acrylic/DWM or the Wayland `ext-background-effect-v1` protocol supported by Niri.
 - Cascadia Mono code typography with subtle, theme-aware translucent gray
   backgrounds for inline code and fenced code blocks.
 
-Opacity and blur are available under **View**. Blur is requested directly from
-the compositor and works when it advertises `ext-background-effect-v1`; on
-other platforms the setting is safely ignored. Lower the background opacity to
-make the compositor effect visible.
+Opacity and blur are available under **View**. On Windows, WType requests Desktop
+Acrylic on current Windows 11 versions and uses composition blur as a fallback on
+compatible Windows 10 versions. On Wayland, blur works when the compositor advertises
+`ext-background-effect-v1`. On unsupported systems the setting is safely ignored.
+Lower the background opacity to make the effect visible.
 
 ## Download
 

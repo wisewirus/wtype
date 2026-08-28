@@ -7,6 +7,124 @@ from typing import Any
 from PySide6.QtWidgets import QApplication, QWidget
 
 
+class _AccentPolicy(ctypes.Structure):
+    _fields_ = [
+        ("accent_state", ctypes.c_int),
+        ("accent_flags", ctypes.c_uint32),
+        ("gradient_color", ctypes.c_uint32),
+        ("animation_id", ctypes.c_uint32),
+    ]
+
+
+class _WindowCompositionAttributeData(ctypes.Structure):
+    _fields_ = [
+        ("attribute", ctypes.c_int),
+        ("data", ctypes.c_void_p),
+        ("data_size", ctypes.c_uint32),
+    ]
+
+
+class _WindowsBlur:
+    """Native Windows backdrop, with a composition blur fallback."""
+
+    _DWMWA_SYSTEMBACKDROP_TYPE = 38
+    _DWMSBT_NONE = 1
+    _DWMSBT_TRANSIENTWINDOW = 3
+    _WCA_ACCENT_POLICY = 19
+    _ACCENT_DISABLED = 0
+    _ACCENT_ENABLE_BLURBEHIND = 3
+
+    def __init__(
+        self,
+        window_handle: int,
+        dwmapi: Any | None = None,
+        user32: Any | None = None,
+    ) -> None:
+        windows_library = getattr(ctypes, "WinDLL", ctypes.CDLL)
+        if dwmapi is None:
+            dwmapi = windows_library("dwmapi", use_last_error=True)
+        if user32 is None:
+            user32 = windows_library("user32", use_last_error=True)
+
+        self._window_handle = window_handle
+        self._mode = ""
+        self._dwm_set_window_attribute = dwmapi.DwmSetWindowAttribute
+        self._dwm_set_window_attribute.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+        ]
+        self._dwm_set_window_attribute.restype = ctypes.c_long
+
+        self._set_window_composition_attribute = getattr(
+            user32, "SetWindowCompositionAttribute", None
+        )
+        if self._set_window_composition_attribute is not None:
+            self._set_window_composition_attribute.argtypes = [
+                ctypes.c_void_p,
+                ctypes.POINTER(_WindowCompositionAttributeData),
+            ]
+            self._set_window_composition_attribute.restype = ctypes.c_int
+
+    @property
+    def available(self) -> bool:
+        return bool(self._mode)
+
+    def connect(self) -> bool:
+        # Desktop Acrylic through the documented API is available on current
+        # Windows 11 releases. Setting NONE is also a side-effect-free probe.
+        if self._set_system_backdrop(self._DWMSBT_NONE):
+            self._mode = "system_backdrop"
+            return True
+
+        # Windows 10 and early Windows 11 builds expose the older composition
+        # accent API instead. It has no import library, so it is loaded at run time.
+        if self._set_accent(self._ACCENT_DISABLED):
+            self._mode = "accent"
+            return True
+        return False
+
+    def set_enabled(self, enabled: bool) -> bool:
+        if self._mode == "system_backdrop":
+            backdrop = self._DWMSBT_TRANSIENTWINDOW if enabled else self._DWMSBT_NONE
+            return self._set_system_backdrop(backdrop)
+        if self._mode == "accent":
+            accent = self._ACCENT_ENABLE_BLURBEHIND if enabled else self._ACCENT_DISABLED
+            return self._set_accent(accent)
+        return False
+
+    def close(self) -> None:
+        if self._mode:
+            self.set_enabled(False)
+            self._mode = ""
+
+    def _set_system_backdrop(self, backdrop: int) -> bool:
+        value = ctypes.c_int(backdrop)
+        result = self._dwm_set_window_attribute(
+            ctypes.c_void_p(self._window_handle),
+            ctypes.c_uint32(self._DWMWA_SYSTEMBACKDROP_TYPE),
+            ctypes.byref(value),
+            ctypes.c_uint32(ctypes.sizeof(value)),
+        )
+        return bool(result >= 0)
+
+    def _set_accent(self, accent_state: int) -> bool:
+        if self._set_window_composition_attribute is None:
+            return False
+        policy = _AccentPolicy(accent_state, 0, 0, 0)
+        data = _WindowCompositionAttributeData(
+            self._WCA_ACCENT_POLICY,
+            ctypes.addressof(policy),
+            ctypes.sizeof(policy),
+        )
+        return bool(
+            self._set_window_composition_attribute(
+                ctypes.c_void_p(self._window_handle), ctypes.byref(data)
+            )
+        )
+
+
 class _WlMessage(ctypes.Structure):
     pass
 
@@ -316,11 +434,11 @@ class _WaylandBlur:
 
 
 class BackgroundEffect:
-    """Optional ext-background-effect-v1 blur for a top-level Qt window."""
+    """Optional native background blur for a top-level Qt window."""
 
     def __init__(self, window: QWidget) -> None:
         self._window = window
-        self._backend: _WaylandBlur | None = None
+        self._backend: _WaylandBlur | _WindowsBlur | None = None
         self._enabled = False
         self.error = ""
 
@@ -336,12 +454,38 @@ class BackgroundEffect:
         if self._backend is not None:
             return self._backend.available
         app = QApplication.instance()
-        if not isinstance(app, QApplication) or sys.platform != "linux":
-            self.error = "Background blur is available on supported Wayland compositors."
+        if not isinstance(app, QApplication):
+            self.error = "Background blur requires a running graphical application."
             return False
-        if app.platformName().lower() != "wayland":
-            self.error = "Background blur requires a native Wayland session."
+
+        if sys.platform == "win32":
+            return self._initialize_windows()
+        if sys.platform == "linux" and app.platformName().lower() == "wayland":
+            return self._initialize_wayland(app)
+
+        self.error = "Background blur is available on Windows and supported Wayland compositors."
+        return False
+
+    def _initialize_windows(self) -> bool:
+        try:
+            window_handle = int(self._window.winId())
+            if not window_handle:
+                raise RuntimeError("Qt did not expose its native window handle")
+            backend = _WindowsBlur(window_handle)
+            if not backend.connect():
+                backend.close()
+                self.error = "This Windows version does not provide a compatible blur effect."
+                return False
+            self._backend = backend
+            if self._enabled:
+                backend.set_enabled(True)
+            self.error = ""
+            return True
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.error = f"Windows background blur is unavailable: {exc}"
             return False
+
+    def _initialize_wayland(self, app: QApplication) -> bool:
         try:
             native: Any = app.nativeInterface()
             display = int(native.display())

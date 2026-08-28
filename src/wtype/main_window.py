@@ -253,10 +253,8 @@ class MainWindow(QMainWindow):
         self.opacity_slider.valueChanged.connect(self.set_background_opacity)
 
         self.blur_action = QAction("Background Blur", self, checkable=True)
-        self.blur_action.setToolTip("Request blur through ext-background-effect-v1")
-        self.blur_action.setStatusTip(
-            "Request background blur from Niri or another supported Wayland compositor"
-        )
+        self.blur_action.setToolTip("Blur the desktop behind WType")
+        self.blur_action.setStatusTip("Use native background blur when supported")
         self.blur_action.toggled.connect(self.set_blur_enabled)
         view_menu.addAction(self.blur_action)
 
@@ -674,9 +672,11 @@ class MainWindow(QMainWindow):
         if not isinstance(app, QApplication):
             return
         self.theme_preference = preference
-        is_wayland = app.platformName().lower() == "wayland"
-        surface_opacity = self.background_opacity / 100 if is_wayland else 1.0
-        self.setWindowOpacity(1.0 if is_wayland else self.background_opacity / 100)
+        uses_translucent_surfaces = app.platformName().lower() in {"wayland", "windows"}
+        surface_opacity = self.background_opacity / 100 if uses_translucent_surfaces else 1.0
+        self.setWindowOpacity(
+            1.0 if uses_translucent_surfaces else self.background_opacity / 100
+        )
         effective = apply_theme(app, preference, surface_opacity)
         self.editor.set_heading_color(THEMES[effective].accent)
         self.editor.set_code_background(THEMES[effective].code_background)
@@ -713,9 +713,7 @@ class MainWindow(QMainWindow):
     def _initialize_background_effect(self) -> None:
         available = self.background_effect.initialize()
         if available:
-            self.blur_action.setStatusTip(
-                "Background blur is supported by this Wayland compositor"
-            )
+            self.blur_action.setStatusTip("Background blur is supported by this window system")
             if self.blur_enabled:
                 self.statusBar().showMessage("Background blur enabled", 3000)
         else:
