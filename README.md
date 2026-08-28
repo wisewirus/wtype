@@ -5,6 +5,8 @@ uses Python and PySide6 for a native desktop interface, visually edits Markdown,
 supports fast formatting shortcuts and input rules, keeps crash-recovery drafts,
 and exports searchable PDFs.
 
+![WType editor Equilibrium theme with blur enabled](docs/images/wtype-editor.png)
+
 ## Features
 
 - Rich Markdown editing with headings, inline styles, links, lists, quotes, code,
