@@ -4,6 +4,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import QMimeData
 from PySide6.QtGui import (
     QFont,
     QFontDatabase,
@@ -15,6 +16,7 @@ from PySide6.QtGui import (
 from PySide6.QtPdf import QPdfDocument
 
 from wtype.app import _load_bundled_fonts
+from wtype.editor import MarkdownEditor
 from wtype.pdf_export import PdfExporter
 from wtype.typography import ARABIC_FONT_FAMILY, CODE_FONT_FAMILY
 
@@ -63,13 +65,17 @@ def test_pdf_code_uses_cascadia_and_gray_box(qapp) -> None:  # type: ignore[no-u
     assert CODE_FONT_FAMILY in code_block.begin().fragment().charFormat().fontFamilies()
 
 
-def test_pdf_source_document_preserves_mixed_styles_inside_rtl_word(
+def test_pdf_source_document_preserves_mixed_styles_inside_rtl_text(
     qapp, tmp_path: Path
 ) -> None:  # type: ignore[no-untyped-def]
     _load_bundled_fonts()
-    source = QTextDocument("برادر")
+    source = QTextDocument("سلام دنیا")
     expected_styles = [
         (False, False),
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
         (False, False),
         (False, True),
         (True, False),
@@ -99,7 +105,7 @@ def test_pdf_source_document_preserves_mixed_styles_inside_rtl_word(
         actual_styles.extend([style] * len(fragment.text()))
         iterator += 1
 
-    assert document.toPlainText() == "برادر"
+    assert document.toPlainText() == "سلام دنیا"
     assert actual_styles == expected_styles
 
     destination = tmp_path / "mixed-styles.pdf"
@@ -107,3 +113,31 @@ def test_pdf_source_document_preserves_mixed_styles_inside_rtl_word(
     pdf = QPdfDocument()
     assert pdf.load(str(destination)) == QPdfDocument.Error.None_
     assert "*" not in pdf.getAllText(0).text()
+
+
+def test_pdf_export_preserves_pasted_markdown_table(qapp, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    _load_bundled_fonts()
+    source = MarkdownEditor()
+    clipboard = QMimeData()
+    clipboard.setText(
+        "# Weekly project plan\n\n"
+        "## Upcoming tasks\n\n"
+        "| Task | Status | Notes |\n"
+        "|---|---|---|\n"
+        "| Write documentation | In progress | Add usage examples. |\n"
+        "| Review tests | Planned | Check export formats. |\n"
+    )
+    source.insertFromMimeData(clipboard)
+    destination = tmp_path / "project-plan.pdf"
+
+    PdfExporter().export_document(source.document(), destination)
+
+    pdf = QPdfDocument()
+    assert pdf.load(str(destination)) == QPdfDocument.Error.None_
+    extracted = pdf.getAllText(0).text()
+    normalized = " ".join(extracted.split())
+    assert "Weekly project plan" in normalized
+    assert "Upcoming tasks" in normalized
+    assert "Write documentation" in normalized
+    assert "Review tests" in normalized
+    assert "|---|" not in normalized

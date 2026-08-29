@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QMimeData, Qt
 from PySide6.QtGui import QColor, QFont, QTextCursor, QTextFormat
 
 from wtype.editor import MarkdownEditor
@@ -195,3 +195,44 @@ def test_horizontal_rule_preserves_existing_paragraph(qtbot) -> None:  # type: i
     markdown = editor.markdown()
     assert markdown.startswith("before\n\n")
     assert markdown.count("- - -") == 1
+
+
+def test_pasting_markdown_renders_document_and_is_undoable(qtbot) -> None:  # type: ignore[no-untyped-def]
+    editor = MarkdownEditor()
+    qtbot.addWidget(editor)
+    clipboard = QMimeData()
+    clipboard.setText(
+        "# Admin authentication and management API\n\n"
+        "Uses the `amazing_admin_session` cookie.\n\n"
+        "## Runtime configuration\n\n"
+        "| Variable | Required/default | Purpose |\n"
+        "|---|---|---|\n"
+        "| `DATABASE_URL` | required | PostgreSQL connection. |\n"
+    )
+
+    editor.insertFromMimeData(clipboard)
+
+    assert editor.document().begin().blockFormat().headingLevel() == 1
+    assert editor.document().begin().next().next().blockFormat().headingLevel() == 2
+    assert editor.document().rootFrame().childFrames()
+    assert "# Admin authentication and management API" in editor.markdown()
+    assert "|`DATABASE_URL`" in editor.markdown()
+    assert "# Admin" not in editor.toPlainText()
+
+    editor.undo()
+    assert editor.toPlainText() == ""
+
+
+def test_plain_text_pasted_inside_paragraph_is_not_reinterpreted(qtbot) -> None:  # type: ignore[no-untyped-def]
+    editor = MarkdownEditor()
+    qtbot.addWidget(editor)
+    editor.set_markdown("Prefix:")
+    cursor = editor.textCursor()
+    cursor.movePosition(QTextCursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+    clipboard = QMimeData()
+    clipboard.setText(" **literal**")
+
+    editor.insertFromMimeData(clipboard)
+
+    assert editor.toPlainText() == "Prefix: **literal**"

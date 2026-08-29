@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QMimeData, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -102,6 +102,23 @@ class MarkdownEditor(QTextEdit):
         (re.compile(r"`([^`\n]+)`$"), "code"),
         (re.compile(r"(?<!\*)\*([^*\n]+)\*$"), "italic"),
     )
+    _PASTED_BLOCK_MARKUP = re.compile(
+        r"(?m)^[ \t]{0,3}(?:"
+        r"#{1,6}[ \t]+|"
+        r">[ \t]?|"
+        r"(?:[-+*]|\d+[.)])[ \t]+|"
+        r"`{3,}|~{3,}|"
+        r"(?:-{3,}|_{3,}|\*{3,})[ \t]*$"
+        r")"
+    )
+    _PASTED_TABLE_DIVIDER = re.compile(
+        r"(?m)^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*"
+        r"(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?[ \t]*$"
+    )
+    _PASTED_INLINE_MARKUP = re.compile(
+        r"(?:\*\*[^*\n]+\*\*|~~[^~\n]+~~|`[^`\n]+`|"
+        r"!?\[[^\]\n]+\]\([^\s)]+(?:[ \t]+[\"'][^\n]*[\"'])?\))"
+    )
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -176,6 +193,39 @@ class MarkdownEditor(QTextEdit):
     def markdown(self) -> str:
         return self.document().toMarkdown(
             QTextDocument.MarkdownFeature.MarkdownDialectGitHub
+        )
+
+    def insertFromMimeData(self, source: QMimeData) -> None:  # noqa: N802 (Qt override)
+        """Render recognizable plain-text Markdown pasted into an empty block.
+
+        QTextEdit otherwise treats clipboard Markdown as literal text. Restricting
+        conversion to an empty insertion block avoids reinterpreting ordinary text
+        pasted into the middle of an existing paragraph.
+        """
+
+        if source.hasText() and self._looks_like_markdown(source.text()):
+            cursor = self.textCursor()
+            cursor.beginEditBlock()
+            if cursor.hasSelection():
+                cursor.removeSelectedText()
+            if not cursor.block().text():
+                cursor.insertMarkdown(
+                    source.text(),
+                    QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
+                )
+            else:
+                cursor.insertText(source.text())
+            cursor.endEditBlock()
+            self.setTextCursor(cursor)
+            return
+        super().insertFromMimeData(source)
+
+    @classmethod
+    def _looks_like_markdown(cls, text: str) -> bool:
+        return bool(
+            cls._PASTED_BLOCK_MARKUP.search(text)
+            or cls._PASTED_TABLE_DIVIDER.search(text)
+            or cls._PASTED_INLINE_MARKUP.search(text)
         )
 
     def _on_text_changed(self) -> None:
