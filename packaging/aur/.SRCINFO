@@ -1,0 +1,22 @@
+pkgbase = wtype-editor
+	pkgdesc = Keyboard-first Markdown writing app
+	pkgver = 0.1.3
+	pkgrel = 1
+	url = https://github.com/wisewirus/wtype
+	arch = any
+	license = GPL-3.0-only
+	checkdepends = python-pytest
+	checkdepends = python-pytest-qt
+	checkdepends = qt6-webengine
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	depends = pyside6
+	depends = python
+	optdepends = qt6-wayland: native Wayland support and blur effects
+	source = wtype-editor-0.1.3.tar.gz::https://github.com/wisewirus/wtype/archive/refs/tags/v0.1.3.tar.gz
+	source = wtype-editor.desktop
+	sha256sums = b329bed81200be3f494ce12812c36624f15b99764c1c23a0bacb19a4058aedd3
+	sha256sums = fe1b34b29b006830dc5105ac738dbbf35835d1242da071118fcb82d534fb8f95
+
+pkgname = wtype-editor

@@ -66,6 +66,21 @@ You can also open a file directly:
 wtype notes.md
 ```
 
+### Arch Linux package
+
+An AUR-ready package recipe is included in `packaging/aur`. To build and install
+it locally:
+
+```bash
+cd packaging/aur
+makepkg -si
+wtype-editor
+```
+
+The package and command are named `wtype-editor` because Arch already provides
+an unrelated Wayland typing utility named `wtype`. The desktop application is
+still displayed as WType.
+
 On Windows, the same setup can be run from PowerShell without activating the
 virtual environment:
 

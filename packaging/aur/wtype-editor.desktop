@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=WType
+GenericName=Markdown Editor
+Comment=Write and edit Markdown documents
+Exec=wtype-editor %f
+TryExec=wtype-editor
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;TextEditor;
+Keywords=Markdown;Writing;Editor;Text;
+MimeType=text/markdown;text/plain;
+StartupNotify=true

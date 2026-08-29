@@ -1,0 +1,55 @@
+# Maintainer: wisewirus <moezziarash at gmail dot com>
+
+pkgname=wtype-editor
+_pkgname=wtype
+pkgver=0.1.3
+pkgrel=1
+pkgdesc="Keyboard-first Markdown writing app"
+arch=('any')
+url="https://github.com/wisewirus/wtype"
+license=('GPL-3.0-only')
+depends=(
+  'pyside6'
+  'python'
+)
+optdepends=(
+  'qt6-wayland: native Wayland support and blur effects'
+)
+makedepends=(
+  'python-build'
+  'python-installer'
+  'python-setuptools'
+)
+checkdepends=(
+  'python-pytest'
+  'python-pytest-qt'
+  'qt6-webengine'
+)
+source=(
+  "$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz"
+  "$pkgname.desktop"
+)
+sha256sums=(
+  'b329bed81200be3f494ce12812c36624f15b99764c1c23a0bacb19a4058aedd3'
+  'fe1b34b29b006830dc5105ac738dbbf35835d1242da071118fcb82d534fb8f95'
+)
+
+build() {
+  cd "$_pkgname-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$_pkgname-$pkgver"
+  QT_QPA_PLATFORM=offscreen PYTHONPATH=src python -m pytest -o addopts=''
+}
+
+package() {
+  cd "$_pkgname-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+
+  # Arch already ships an unrelated Wayland utility at /usr/bin/wtype.
+  mv "$pkgdir/usr/bin/wtype" "$pkgdir/usr/bin/wtype-editor"
+  install -Dm644 "$srcdir/$pkgname.desktop" \
+    "$pkgdir/usr/share/applications/$pkgname.desktop"
+}
