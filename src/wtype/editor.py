@@ -21,13 +21,13 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QInputDialog, QTextEdit, QWidget
 
 from wtype import alternatives
-from wtype.typography import BODY_FONT_FAMILIES, CODE_FONT_FAMILIES
+from wtype.typography import BODY_FONT_FAMILIES, CODE_FONT_FAMILIES, HEADING_SCALES
 
 
 class MarkdownHighlighter(QSyntaxHighlighter):
     """Adds view-only heading and code typography without changing Markdown."""
 
-    _SCALE = (2.0, 1.67, 1.42, 1.25, 1.12, 1.04)
+    _SCALE = HEADING_SCALES
 
     def __init__(self, document: QTextDocument, base_size: float) -> None:
         super().__init__(document)

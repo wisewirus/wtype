@@ -21,6 +21,55 @@ from wtype.pdf_export import PdfExporter
 from wtype.typography import ARABIC_FONT_FAMILY, BODY_FONT_FAMILY, CODE_FONT_FAMILY
 
 
+@pytest.mark.parametrize("source_kind", ["markdown", "editor", "command"])
+def test_pdf_heading_sizes_and_inline_styles(
+    qtbot, source_kind: str
+) -> None:  # type: ignore[no-untyped-def]
+    markdown = "\n\n".join(
+        [f"{'#' * level} Heading *italic* `code` سلام" for level in range(1, 7)]
+        + ["Body text"]
+    )
+    exporter = PdfExporter()
+    if source_kind == "markdown":
+        document = exporter._print_document(markdown, "Headings")
+    else:
+        editor = MarkdownEditor()
+        qtbot.addWidget(editor)
+        editor.configure_typography(QFont(BODY_FONT_FAMILY, 24))
+        if source_kind == "editor":
+            editor.set_markdown(markdown)
+        else:
+            editor.set_markdown(markdown.replace("#", "").lstrip())
+            block = editor.document().begin()
+            for level in range(1, 7):
+                editor.setTextCursor(QTextCursor(block))
+                editor.set_heading(level)
+                block = block.next()
+        original = editor.document().toHtml()
+        document = exporter._print_source_document(editor.document(), "Headings")
+        assert editor.document().toHtml() == original
+
+    block = document.begin()
+    for size in (22, 18.37, 15.62, 13.75, 12.32, 11.44):
+        iterator = block.begin()
+        italic_found = code_found = False
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            char_format = fragment.charFormat()
+            assert char_format.fontPointSize() == pytest.approx(size)
+            assert char_format.fontWeight() >= QFont.Weight.DemiBold
+            if fragment.text() == "italic":
+                italic_found = char_format.fontItalic()
+            if fragment.text() == "code":
+                code_found = CODE_FONT_FAMILY in char_format.fontFamilies()
+            iterator += 1
+        assert italic_found and code_found
+        block = block.next()
+    assert block.text() == "Body text"
+    assert block.begin().fragment().charFormat().fontPointSize() in (0, 11)
+    assert document.defaultFont().pointSizeF() == 11
+
+
 def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
     _load_bundled_fonts()
     destination = tmp_path / "document.pdf"

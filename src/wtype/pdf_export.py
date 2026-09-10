@@ -24,6 +24,7 @@ from wtype.typography import (
     ARABIC_FONT_FAMILY,
     BODY_FONT_FAMILIES,
     CODE_FONT_FAMILIES,
+    HEADING_SCALES,
 )
 
 
@@ -173,6 +174,20 @@ class PdfExporter:
                 cursor.mergeCharFormat(code_format)
             else:
                 self._style_inline_code(block, code_font, code_background)
+            if 1 <= heading <= len(HEADING_SCALES):
+                # Editor heading sizes live in a syntax highlighter and are not
+                # cloned. Apply print sizes explicitly, including inline code.
+                heading_format = QTextCharFormat()
+                heading_format.setFontPointSize(
+                    document.defaultFont().pointSizeF() * HEADING_SCALES[heading - 1]
+                )
+                heading_format.setFontWeight(QFont.Weight.Bold)
+                cursor.setPosition(block.position())
+                cursor.setPosition(
+                    block.position() + block.length() - 1,
+                    QTextCursor.MoveMode.KeepAnchor,
+                )
+                cursor.mergeCharFormat(heading_format)
             block = block.next()
 
         self._style_font_families(document)

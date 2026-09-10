@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+HEADING_SCALES = (2.0, 1.67, 1.42, 1.25, 1.12, 1.04)
+
 BODY_FONT_FAMILY = "Outfit"
 ARABIC_FONT_FAMILY = "Vazirmatn"
 BODY_FONT_FAMILIES = (
