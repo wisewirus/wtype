@@ -18,7 +18,7 @@ from PySide6.QtPdf import QPdfDocument
 from wtype.app import _load_bundled_fonts
 from wtype.editor import MarkdownEditor
 from wtype.pdf_export import PdfExporter
-from wtype.typography import ARABIC_FONT_FAMILY, CODE_FONT_FAMILY
+from wtype.typography import ARABIC_FONT_FAMILY, BODY_FONT_FAMILY, CODE_FONT_FAMILY
 
 
 def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
@@ -26,10 +26,10 @@ def test_pdf_export_creates_pdf_with_unicode(qapp, tmp_path: Path) -> None:  # t
     destination = tmp_path / "document.pdf"
 
     pdf_font = PdfExporter.preferred_pdf_font()
-    assert pdf_font == ARABIC_FONT_FAMILY
+    assert pdf_font == BODY_FONT_FAMILY
     assert QFontDatabase.WritingSystem.Arabic in QFontDatabase.writingSystems(
-        pdf_font
-    ), pdf_font
+        ARABIC_FONT_FAMILY
+    )
 
     PdfExporter().export("# Hello\n\nسلام دنیا\n", destination)
 
@@ -141,3 +141,34 @@ def test_pdf_export_preserves_pasted_markdown_table(qapp, tmp_path: Path) -> Non
     assert "Write documentation" in normalized
     assert "Review tests" in normalized
     assert "|---|" not in normalized
+
+
+@pytest.mark.parametrize("from_editor", [False, True])
+def test_pdf_embeds_body_code_and_persian_fonts(
+    qapp, tmp_path: Path, from_editor: bool
+) -> None:  # type: ignore[no-untyped-def]
+    _load_bundled_fonts()
+    markdown = (
+        "# Heading\n\nOutfit body **bold** and `inline_code`.\n\n"
+        "سلام دنیا\n\n```\nprint('Hello')\n```\n"
+    )
+    exporter = PdfExporter()
+    destination = tmp_path / "fonts.pdf"
+    if from_editor:
+        editor = MarkdownEditor()
+        editor.set_markdown(markdown)
+        exporter.export_document(editor.document(), destination)
+    else:
+        exporter.export(markdown, destination)
+
+    data = destination.read_bytes()
+    for font in (b"Outfit-Regular", b"Outfit-Bold", b"CascadiaMono-Regular", b"Vazirmatn-Regular"):
+        assert font in data
+    assert b"/FontFile2" in data
+    pdf = QPdfDocument()
+    assert pdf.load(str(destination)) == QPdfDocument.Error.None_
+    extracted = pdf.getAllText(0).text()
+    assert "Outfit body" in extracted
+    assert "سلام دنیا" in extracted
+    assert "inline_code" in extracted
+    assert "print" in extracted

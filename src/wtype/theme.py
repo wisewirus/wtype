@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import QApplication
 
 from wtype.typography import BODY_FONT_FAMILIES
@@ -49,6 +50,54 @@ THEMES: dict[str, Theme] = {
         "#4556d6",
         "#cfd6ff",
         "#171a21",
+    ),
+    "catppuccin-latte": Theme(
+        key="catppuccin-latte",
+        label="Catppuccin Latte",
+        dark=False,
+        window="#e6e9ef",
+        surface="#dce0e8",
+        elevated="#eff1f5",
+        editor="#eff1f5",
+        text="#4c4f69",
+        muted="#5c5f77",
+        border="#bcc0cc",
+        accent="#8839ef",
+        accent_hover="#1e66f5",
+        selection="#ccd0da",
+        selected_text="#4c4f69",
+    ),
+    "solarized-light": Theme(
+        key="solarized-light",
+        label="Solarized Light",
+        dark=False,
+        window="#eee8d5",
+        surface="#eee8d5",
+        elevated="#fdf6e3",
+        editor="#fdf6e3",
+        text="#073642",
+        muted="#586e75",
+        border="#93a1a1",
+        accent="#268bd2",
+        accent_hover="#6c71c4",
+        selection="#eee8d5",
+        selected_text="#073642",
+    ),
+    "gruvbox-light": Theme(
+        key="gruvbox-light",
+        label="Gruvbox Light",
+        dark=False,
+        window="#f2e5bc",
+        surface="#ebdbb2",
+        elevated="#fbf1c7",
+        editor="#fbf1c7",
+        text="#3c3836",
+        muted="#665c54",
+        border="#bdae93",
+        accent="#9d0006",
+        accent_hover="#af3a03",
+        selection="#d5c4a1",
+        selected_text="#3c3836",
     ),
     "dark": Theme(
         "dark",
@@ -199,6 +248,9 @@ THEMES: dict[str, Theme] = {
 THEME_CHOICES: tuple[tuple[str, str], ...] = (
     ("system", "Follow system"),
     ("light", THEMES["light"].label),
+    ("catppuccin-latte", THEMES["catppuccin-latte"].label),
+    ("solarized-light", THEMES["solarized-light"].label),
+    ("gruvbox-light", THEMES["gruvbox-light"].label),
     ("dark", THEMES["dark"].label),
     ("tokyo-night", THEMES["tokyo-night"].label),
     ("catppuccin", THEMES["catppuccin"].label),
@@ -261,14 +313,17 @@ def _with_opacity(color: str, opacity: float) -> str:
     return f"rgba({value.red()}, {value.green()}, {value.blue()}, {round(opacity * 255)})"
 
 
-def _build_stylesheet(theme: Theme, background_opacity: float = 1.0) -> str:
-    accent_text = "#ffffff" if not theme.dark else theme.editor
+def _build_stylesheet(
+    theme: Theme, background_opacity: float = 1.0,
+    *, interface_font_size: int = 10, editor_font_size: float = 12,
+) -> str:
     window_background = _with_opacity(theme.window, background_opacity)
     surface_background = _with_opacity(theme.surface, background_opacity)
     elevated_background = _with_opacity(theme.elevated, background_opacity)
     editor_background = _with_opacity(theme.editor, background_opacity)
-    editor_border = "#737780" if theme.dark else "#a5a9b1"
+    editor_border = theme.border
     body_font_stack = ", ".join(f'"{family}"' for family in BODY_FONT_FAMILIES)
+    chevron = (Path(__file__).with_name("assets") / "chevron-down.svg").as_posix()
     return f"""
 QMainWindow {{
     background: transparent;
@@ -276,22 +331,84 @@ QMainWindow {{
 QWidget {{
     color: {theme.text};
     font-family: {body_font_stack};
+    font-size: {interface_font_size}pt;
+}}
+QDialog {{
+    background: {theme.window};
+}}
+QScrollArea#appearanceScroll, QWidget#appearanceContent {{
+    background: {theme.window};
+    border: 0;
+}}
+QFrame#appearanceSection {{
+    background: {theme.surface};
+    border: 1px solid {theme.border};
+    border-radius: 10px;
+}}
+QLabel#appearanceSectionTitle {{
+    font-weight: 600;
+}}
+QLabel#appearanceHint {{
+    color: {theme.muted};
+}}
+QDialog#appearanceDialog QSpinBox, QDialog#appearanceDialog QComboBox {{
+    background: {theme.editor};
+}}
+QDialog#appearanceDialog QToolButton {{
+    background: {theme.elevated};
+    border-color: {theme.border};
+    padding: 7px 14px;
+}}
+QDialog#appearanceDialog QToolButton:hover {{
+    background: {theme.selection};
+    border-color: {theme.accent};
+}}
+QLabel#documentTitle {{
+    font-size: {interface_font_size + 2}pt;
+    font-weight: 600;
+}}
+QLabel#appearanceTitle {{
+    font-size: {interface_font_size + 5}pt;
+    font-weight: 600;
+}}
+QLabel#documentState, QLabel#documentStats {{
+    color: {theme.muted};
+}}
+QPushButton#saveButton {{
+    background: {theme.selection};
+    color: {theme.selected_text};
+    border-color: {theme.border};
+    padding-left: 14px;
+    padding-right: 14px;
+}}
+QPushButton#saveButton:hover {{
+    background: {theme.selection};
+    border-color: {theme.accent};
+}}
+QPushButton#chooseAlternativeButton {{
+    background: {elevated_background};
+    color: {theme.text};
+    border-color: {theme.border};
+    padding-right: 24px;
+}}
+QComboBox QAbstractItemView {{
+    background: {theme.elevated};
+    selection-background-color: {theme.selection};
+    selection-color: {theme.selected_text};
 }}
 QWidget#editorShell {{
     background: {window_background};
 }}
 QMenuBar {{
-    background: {surface_background};
+    background: {window_background};
     color: {theme.text};
     border: 0;
-    border-bottom: 1px solid {theme.border};
-    padding: 4px 8px;
-    font-size: 13px;
+    padding: 2px 12px;
 }}
 QMenuBar::item {{
     background: transparent;
     border-radius: 6px;
-    padding: 6px 10px;
+    padding: 5px 9px;
 }}
 QMenuBar::item:selected {{
     background: {elevated_background};
@@ -300,9 +417,8 @@ QMenu {{
     background: {elevated_background};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 9px;
+    border-radius: 8px;
     padding: 6px;
-    font-size: 13px;
 }}
 QMenu::item {{
     border-radius: 6px;
@@ -321,28 +437,44 @@ QMenu::separator {{
     margin: 5px 8px;
 }}
 QToolBar {{
-    background: {surface_background};
+    background: transparent;
     border: 0;
     border-bottom: 1px solid {theme.border};
-    spacing: 4px;
-    padding: 8px 12px;
+    spacing: 3px;
+    padding: 2px 0 8px 0;
 }}
 QToolBar::separator {{
     background: {theme.border};
     width: 1px;
-    margin: 5px 7px;
+    margin: 7px 6px;
 }}
 QToolButton {{
     background: transparent;
     color: {theme.text};
     border: 1px solid transparent;
-    border-radius: 7px;
-    padding: 7px 9px;
-    font-size: 13px;
+    border-radius: 5px;
+    padding: 7px;
 }}
 QToolButton:hover {{
     background: {elevated_background};
     border-color: {theme.border};
+}}
+QToolButton:focus {{
+    border-color: {theme.accent};
+}}
+QToolButton[popupMode="2"] {{
+    padding-right: 16px;
+}}
+QToolButton#qt_toolbar_ext_button {{
+    padding: 0;
+    border: 0;
+}}
+QToolButton::menu-indicator, QPushButton::menu-indicator {{
+    image: url("{chevron}");
+    width: 12px;
+    height: 12px;
+    subcontrol-position: right center;
+    right: 5px;
 }}
 QToolButton:pressed, QToolButton:checked {{
     background: {theme.selection};
@@ -354,7 +486,7 @@ QToolButton:disabled {{
 }}
 QLabel#brandLabel {{
     color: {theme.text};
-    font-size: 15px;
+    font-size: {interface_font_size + 3}pt;
     font-weight: 700;
     padding: 0 7px 0 2px;
 }}
@@ -362,54 +494,70 @@ QTextEdit#editor {{
     background: {editor_background};
     color: {theme.text};
     border: 1px solid {editor_border};
-    border-radius: 0;
-    padding: 42px 54px;
-    font-size: 12pt;
+    border-radius: 12px;
+    padding: 32px 36px;
+    font-size: {editor_font_size}pt;
     selection-background-color: {theme.selection};
     selection-color: {theme.selected_text};
 }}
 QTextEdit#editor:focus {{
     border-color: {editor_border};
 }}
-QWidget#findBar {{
+QWidget#findBar, QWidget#alternativesBar {{
     background: {surface_background};
     border: 1px solid {theme.border};
-    border-radius: 10px;
+    border-radius: 7px;
 }}
-QLineEdit {{
+QLineEdit, QSpinBox, QComboBox {{
     background: {editor_background};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 7px;
+    border-radius: 6px;
     padding: 7px 10px;
-    font-size: 13px;
     selection-background-color: {theme.selection};
     selection-color: {theme.selected_text};
 }}
-QLineEdit:focus {{
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
     border-color: {theme.accent};
+}}
+QComboBox {{
+    padding-right: 28px;
+}}
+QComboBox::drop-down {{
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border: 0;
+    background: transparent;
+}}
+QComboBox::down-arrow {{
+    image: url("{chevron}");
+    width: 12px;
+    height: 12px;
 }}
 QPushButton {{
     background: {elevated_background};
     color: {theme.text};
     border: 1px solid {theme.border};
-    border-radius: 7px;
+    border-radius: 6px;
     padding: 7px 12px;
-    font-size: 13px;
 }}
 QPushButton:hover {{
-    background: {theme.accent_hover};
-    color: {accent_text};
-    border-color: {theme.accent_hover};
+    background: {theme.selection};
+    color: {theme.selected_text};
+    border-color: {theme.accent};
+}}
+QPushButton:focus {{
+    border-color: {theme.accent};
 }}
 QPushButton:pressed {{
     background: {theme.accent};
 }}
 QStatusBar {{
-    background: {surface_background};
+    background: {window_background};
     color: {theme.muted};
     border-top: 1px solid {theme.border};
-    padding: 3px 10px;
+    padding: 2px 16px;
 }}
 QStatusBar::item {{
     border: 0;
@@ -438,32 +586,32 @@ QToolTip {{
     border: 1px solid {theme.border};
     padding: 5px;
 }}
-QSlider#opacitySlider::groove:horizontal {{
-    background: {theme.border};
-    border: 0;
-    border-radius: 2px;
-    height: 4px;
-}}
-QSlider#opacitySlider::sub-page:horizontal {{
-    background: {theme.accent};
-    border-radius: 2px;
-}}
-QSlider#opacitySlider::handle:horizontal {{
-    background: {theme.text};
-    border: 2px solid {theme.accent};
-    border-radius: 7px;
-    height: 12px;
-    width: 12px;
-    margin: -5px 0;
-}}
-QLabel#opacityValue {{
-    color: {theme.muted};
-}}
 """
 
 
-def apply_theme(app: QApplication, preference: str, background_opacity: float = 1.0) -> str:
+def apply_theme(
+    app: QApplication, preference: str, background_opacity: float = 1.0,
+    *, interface_font_size: int = 10, editor_font_size: float = 12,
+) -> str:
     theme = resolve_theme(app, preference)
+    font = QFont(app.font())
+    font.setFamilies(list(BODY_FONT_FAMILIES))
+    font.setPointSize(interface_font_size)
+    font.setFixedPitch(False)
+    app.setFont(font)
     app.setPalette(_build_palette(theme))
-    app.setStyleSheet(_build_stylesheet(theme, background_opacity))
+    apply_theme_stylesheet(
+        app, theme, background_opacity,
+        interface_font_size=interface_font_size, editor_font_size=editor_font_size,
+    )
     return theme.key
+
+
+def apply_theme_stylesheet(
+    app: QApplication, theme: Theme, background_opacity: float = 1.0,
+    *, interface_font_size: int = 10, editor_font_size: float = 12,
+) -> None:
+    app.setStyleSheet(_build_stylesheet(
+        theme, background_opacity,
+        interface_font_size=interface_font_size, editor_font_size=editor_font_size,
+    ))

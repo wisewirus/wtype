@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from PySide6.QtCore import QMarginsF, Qt
@@ -22,7 +23,6 @@ from PySide6.QtPrintSupport import QPrinter
 from wtype.typography import (
     ARABIC_FONT_FAMILY,
     BODY_FONT_FAMILIES,
-    BODY_FONT_FAMILY,
     CODE_FONT_FAMILIES,
 )
 
@@ -35,20 +35,7 @@ class PdfExporter:
     """Render Markdown into a clean, searchable A4 PDF."""
 
     EDITOR_FONTS = BODY_FONT_FAMILIES
-    # Use one font with native Arabic coverage so Qt does not mix a Latin-only
-    # base font with platform fallback glyphs. Mixed-font fallback can produce
-    # invalid ToUnicode maps in PDFs, particularly through CoreText on macOS.
-    PDF_FONTS = (
-        ARABIC_FONT_FAMILY,
-        "DejaVu Sans",
-        "Arial",
-        "Segoe UI",
-        "Geeza Pro",
-        "Noto Sans Arabic",
-        "Noto Naskh Arabic",
-        "Noto Sans",
-        BODY_FONT_FAMILY,
-    )
+    PDF_FONTS = BODY_FONT_FAMILIES
     CODE_FONTS = CODE_FONT_FAMILIES
 
     @classmethod
@@ -62,11 +49,6 @@ class PdfExporter:
 
     @classmethod
     def preferred_pdf_font(cls) -> str:
-        installed = set(QFontDatabase.families())
-        arabic = QFontDatabase.WritingSystem.Arabic
-        for family in cls.PDF_FONTS:
-            if family in installed and arabic in QFontDatabase.writingSystems(family):
-                return family
         return cls._preferred_font(cls.PDF_FONTS)
 
     @classmethod
@@ -95,6 +77,7 @@ class PdfExporter:
     def _write_pdf(document: QTextDocument, destination: Path) -> None:
 
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setFontEmbeddingEnabled(True)
         printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
         printer.setOutputFileName(str(destination))
         printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
@@ -136,6 +119,7 @@ class PdfExporter:
 
     def _configure_document(self, document: QTextDocument, title: str) -> None:
         font = QFont(self.preferred_pdf_font(), 11)
+        font.setFamilies(list(self.PDF_FONTS))
         font.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
         document.setDefaultFont(font)
         document.setDocumentMargin(0)
@@ -143,6 +127,7 @@ class PdfExporter:
 
     def _style_document(self, document: QTextDocument) -> None:
         code_font = QFont(self.preferred_code_font(), 10)
+        code_font.setFamilies(list(self.CODE_FONTS))
         code_font.setFixedPitch(True)
         code_background = QColor(128, 128, 128, 24)
         block = document.begin()
@@ -190,7 +175,40 @@ class PdfExporter:
                 self._style_inline_code(block, code_font, code_background)
             block = block.next()
 
+        self._style_font_families(document)
         self._style_tables(document)
+
+    def _style_font_families(self, document: QTextDocument) -> None:
+        # Override families inherited from pasted text without disturbing weight,
+        # italics or heading sizes. Explicit Arabic runs also avoid platform PDF
+        # fallback issues with glyph-to-Unicode mapping.
+        ranges: list[tuple[int, int, list[str]]] = []
+        block = document.begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.isValid():
+                    families = self.CODE_FONTS if (
+                        self._is_code_block(block) or fragment.charFormat().fontFixedPitch()
+                    ) else self.PDF_FONTS
+                    ranges.append((fragment.position(), fragment.length(), list(families)))
+                    for match in re.finditer(
+                        r"[\u0600-\u06ff\u0750-\u077f\u0870-\u089f"
+                        r"\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]+", fragment.text()
+                    ):
+                        start = len(fragment.text()[:match.start()].encode("utf-16-le")) // 2
+                        length = len(match.group().encode("utf-16-le")) // 2
+                        ranges.append((fragment.position() + start, length, [ARABIC_FONT_FAMILY]))
+                iterator += 1
+            block = block.next()
+        for start, length, run_families in ranges:
+            cursor = QTextCursor(document)
+            cursor.setPosition(start)
+            cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+            char_format = QTextCharFormat()
+            char_format.setFontFamilies(run_families)
+            cursor.mergeCharFormat(char_format)
 
     @staticmethod
     def _is_code_block(block: QTextBlock) -> bool:

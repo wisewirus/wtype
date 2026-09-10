@@ -7,6 +7,7 @@ from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import QApplication
 
+from wtype import __version__
 from wtype.main_window import MainWindow
 from wtype.typography import (
     BODY_FONT_FAMILIES,
@@ -33,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     QCoreApplication.setOrganizationName("WType")
     QCoreApplication.setOrganizationDomain("wtype.local")
     QCoreApplication.setApplicationName("WType")
-    QCoreApplication.setApplicationVersion("0.1.3")
+    QCoreApplication.setApplicationVersion(__version__)
 
     app = QApplication(arguments)
     app.setAttribute(Qt.ApplicationAttribute.AA_DontShowIconsInMenus, False)

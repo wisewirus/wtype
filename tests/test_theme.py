@@ -32,14 +32,14 @@ def test_theme_applies_its_palette(qapp, theme_key: str) -> None:  # type: ignor
     assert THEMES[theme_key].window in qapp.styleSheet()
 
 
-def test_translucent_theme_uses_outfit_and_rectangular_neutral_editor(qapp) -> None:  # type: ignore[no-untyped-def]
+def test_translucent_theme_uses_outfit_and_subtle_editor_border(qapp) -> None:  # type: ignore[no-untyped-def]
     apply_theme(qapp, "tokyo-night", 0.72)
 
     stylesheet = qapp.styleSheet()
     assert 'font-family: "Outfit", "Vazirmatn"' in stylesheet
     assert "background: rgba(" in stylesheet
-    assert "border-radius: 0;" in stylesheet
-    assert "QTextEdit#editor:focus {\n    border-color: #737780;" in stylesheet
+    assert "border-radius: 12px;" in stylesheet
+    assert "QTextEdit#editor:focus {\n    border-color: #3b4261;" in stylesheet
 
 
 def test_code_backgrounds_are_translucent_neutral_grays() -> None:

@@ -176,6 +176,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/download-artifact@v8
         with:
           path: release-assets
@@ -193,8 +196,12 @@ jobs:
               --clobber \
               --repo "$GITHUB_REPOSITORY"
           else
+            notes_args=(--generate-notes)
+            if [[ -f "packaging/releases/$RELEASE_TAG.md" ]]; then
+              notes_args=(--notes-file "packaging/releases/$RELEASE_TAG.md")
+            fi
             gh release create "$RELEASE_TAG" release-assets/* \
-              --generate-notes \
+              "${notes_args[@]}" \
               --latest \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \

@@ -16,9 +16,11 @@ from PySide6.QtGui import (
     QTextFormat,
     QTextListFormat,
     QTextTableFormat,
+    QWheelEvent,
 )
 from PySide6.QtWidgets import QInputDialog, QTextEdit, QWidget
 
+from wtype import alternatives
 from wtype.typography import BODY_FONT_FAMILIES, CODE_FONT_FAMILIES
 
 
@@ -95,6 +97,7 @@ class MarkdownEditor(QTextEdit):
     markdown_changed = Signal(str)
     format_state_changed = Signal()
     table_state_changed = Signal(bool)
+    zoom_requested = Signal(int)
 
     _INLINE_RULES = (
         (re.compile(r"\*\*([^*\n]+)\*\*$"), "bold"),
@@ -124,6 +127,7 @@ class MarkdownEditor(QTextEdit):
         super().__init__(parent)
         self._loading = False
         self._input_rule_just_applied = False
+        self._zoom_wheel_delta = 0
         self.setAcceptRichText(False)
         self.setTabChangesFocus(False)
         self.setUndoRedoEnabled(True)
@@ -154,6 +158,18 @@ class MarkdownEditor(QTextEdit):
             max(editor_font.pointSizeF(), 1.0)
         )
 
+    def wheelEvent(self, event: QWheelEvent) -> None:  # noqa: N802 (Qt override)
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self._zoom_wheel_delta += event.angleDelta().y()
+            steps = int(self._zoom_wheel_delta / 120)
+            if steps:
+                self._zoom_wheel_delta -= steps * 120
+                self.zoom_requested.emit(steps)
+            event.accept()
+            return
+        self._zoom_wheel_delta = 0
+        super().wheelEvent(event)
+
     @staticmethod
     def _body_font(font: QFont) -> QFont:
         body_font = QFont(font)
@@ -175,10 +191,7 @@ class MarkdownEditor(QTextEdit):
     def set_markdown(self, markdown: str) -> None:
         self._loading = True
         try:
-            self.document().setMarkdown(
-                markdown,
-                QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
-            )
+            alternatives.load(self.document(), markdown)
             self.document().clearUndoRedoStacks()
             self.document().setModified(False)
             cursor = self.textCursor()
@@ -191,6 +204,9 @@ class MarkdownEditor(QTextEdit):
         self._on_cursor_changed()
 
     def markdown(self) -> str:
+        return alternatives.serialize(self.document())
+
+    def active_markdown(self) -> str:
         return self.document().toMarkdown(
             QTextDocument.MarkdownFeature.MarkdownDialectGitHub
         )
@@ -206,6 +222,16 @@ class MarkdownEditor(QTextEdit):
         if source.hasText() and self._looks_like_markdown(source.text()):
             cursor = self.textCursor()
             cursor.beginEditBlock()
+            frame = alternatives.current_frame(cursor)
+            if (
+                frame is not None
+                and cursor.selectionStart() == frame.firstPosition()
+                and cursor.selectionEnd() == frame.lastPosition()
+            ):
+                alternatives.replace_contents(frame, source.text())
+                cursor.endEditBlock()
+                self.setTextCursor(frame.lastCursorPosition())
+                return
             if cursor.hasSelection():
                 cursor.removeSelectedText()
             if not cursor.block().text():
@@ -247,6 +273,12 @@ class MarkdownEditor(QTextEdit):
                 )
                 selections.append(selection)
             block = block.next()
+        for frame in self.document().rootFrame().childFrames():
+            if frame.frameFormat().hasProperty(alternatives.PROPERTY):
+                selection = QTextEdit.ExtraSelection()
+                selection.cursor = alternatives.contents(frame)
+                selection.format.setBackground(QColor(128, 128, 128, 18))
+                selections.append(selection)
         self.setExtraSelections(selections)
 
     def _on_cursor_changed(self) -> None:

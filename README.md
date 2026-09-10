@@ -11,6 +11,10 @@ and exports searchable PDFs.
 
 - Rich Markdown editing with headings, inline styles, links, lists, quotes, code,
   horizontal rules, and GitHub-flavored Markdown tables.
+- Compact icon toolbar with theme-aware line icons, shortcut tooltips, and
+  accessible control names. Appearance and file actions remain beside the document title.
+- Named paragraph alternatives: try another draft in place, switch versions, and
+  undo changes while keeping the surrounding document intact.
 - `Ctrl+B`/`Cmd+B` for bold, `Ctrl+I`/`Cmd+I` for italic,
   `Ctrl+1`…`Ctrl+6`/`Cmd+1`…`Cmd+6` for headings, and `Ctrl+T`/`Cmd+T` for a table.
 - Markdown input rules such as `## `, `- `, `> `, and triple backticks.
@@ -19,10 +23,14 @@ and exports searchable PDFs.
   Persian/Arabic writing.
 - Direct A4 PDF export with selectable text.
 - Distinct, readable typography for all six Markdown heading levels.
+- Separate writing and interface text sizes, with a live preview under
+  **View → Appearance…** (also available beside Open and Save).
+- Word-style document zoom from 50–200%, with a status-bar slider, plus/minus
+  buttons, and a clickable percentage to return to 100%.
 - Bundled Outfit typography for Latin text and Vazirmatn typography for
   Persian and Arabic across the interface, writing canvas, and PDF export.
-- System, WType Light/Dark, Tokyo Night, Catppuccin, Everforest, Nord,
-  Gruvbox, Equilibrium, Solarized, and Adapta themes.
+- System, WType Light/Dark, Tokyo Night, Catppuccin Mocha/Latte, Everforest,
+  Nord, Gruvbox Dark/Light, Equilibrium, Solarized Dark/Light, and Adapta themes.
 - Adjustable background opacity and optional native blur using Windows Desktop
   Acrylic/DWM or the Wayland `ext-background-effect-v1` protocol supported by Niri.
 - Cascadia Mono code typography with subtle, theme-aware translucent gray
@@ -33,6 +41,39 @@ Acrylic on current Windows 11 versions and uses composition blur as a fallback o
 compatible Windows 10 versions. On Wayland, blur works when the compositor advertises
 `ext-background-effect-v1`. On unsupported systems the setting is safely ignored.
 Lower the background opacity to make the effect visible.
+
+Choose writing text from 9–32 pt and interface text from 9–20 pt in Appearance.
+Zoom magnifies the writing area independently of these sizes; Markdown content
+and PDF export styling stay the same. Text sizes and zoom are remembered between
+sessions. Use **Primary + mouse wheel**, **Primary + +/−**, or **View → Zoom**.
+**Primary+Shift+0** restores 100% zoom; **Primary+0** still selects paragraph style.
+
+## Paragraph alternatives
+
+Place the cursor in a paragraph (or select text within it), then choose
+**Edit → New Paragraph Alternative**, click the branch icon in the toolbar, or
+press **Primary+Alt+N**. WType keeps **Original** and selects a copy named
+**Version 2** for you to edit. A version can grow into multiple paragraphs.
+
+Click inside a passage with alternatives, then click **Versions** above
+the editor. The menu lists every version and marks the current one. Choose any
+entry to use it immediately; switching keeps the edits in the version you leave.
+Hover an entry to preview its text. The plus, pencil, and trash controls create,
+rename, and remove versions. Creating, switching, renaming, and removing versions
+support Undo/Redo. Removing the last extra draft turns the remaining version back
+into ordinary text.
+
+Close the versions bar with its **×** button or **Esc**. It stays closed while
+you write. Reopen it with the branch icon in the toolbar or
+**Edit → Paragraph Alternatives** (**Primary+Alt+V**) without creating another draft.
+Start alternatives in prose paragraphs or headings; selecting multiple existing
+paragraphs, list items, or table cells is not supported.
+
+Normal saves and recovery drafts retain **all versions** in WType HTML comments
+inside the Markdown file. Other Markdown readers normally hide those comments,
+but the inactive text is still present in the file. For sharing only the visible
+versions, use **File → Export Current Versions as Markdown…** or **Export as PDF…**.
+Keep the WType comments intact when editing the saved file in another application.
 
 ## Download
 
@@ -105,6 +146,8 @@ py -3 -m venv .venv
 | Blockquote / code block | Primary+Shift+Q / Primary+Shift+C |
 | Horizontal rule | Primary+Shift+H |
 | Export PDF | Primary+Shift+E |
+| New paragraph alternative | Primary+Alt+N |
+| Show paragraph alternatives | Primary+Alt+V |
 | Shortcut reference | Primary+/ |
 
 ## Quality checks
@@ -130,8 +173,8 @@ GitHub Actions builds all supported release archives when a version tag is
 pushed. The tag must match the version in `pyproject.toml`:
 
 ```bash
-git tag v0.1.3
-git push origin v0.1.3
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The release can also be started from **Actions → Release → Run workflow** with a

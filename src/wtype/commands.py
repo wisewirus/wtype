@@ -18,6 +18,7 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("file.save", "Save", ("Primary+S",), status_tip="Save the current document"),
     CommandSpec("file.save_as", "Save As…", ("Primary+Shift+S",)),
     CommandSpec("file.export_pdf", "Export as PDF…", ("Primary+Shift+E",)),
+    CommandSpec("file.export_active", "Export Current Versions as Markdown…"),
     CommandSpec("file.quit", "Quit", ("Primary+Q",)),
     CommandSpec("edit.undo", "Undo", ("Primary+Z",)),
     CommandSpec("edit.redo", "Redo", ("Primary+Shift+Z", "Primary+Y")),
@@ -26,6 +27,14 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("edit.paste", "Paste", ("Primary+V",)),
     CommandSpec("edit.select_all", "Select All", ("Primary+A",)),
     CommandSpec("edit.find", "Find", ("Primary+F",)),
+    CommandSpec(
+        "edit.new_alternative", "New Paragraph Alternative", ("Primary+Alt+N",),
+        status_tip="Keep this paragraph and edit another version in place",
+    ),
+    CommandSpec(
+        "edit.show_alternatives", "Paragraph Alternatives", ("Primary+Alt+V",),
+        status_tip="Show versions of the current paragraph",
+    ),
     CommandSpec("format.bold", "Bold", ("Primary+B",), True),
     CommandSpec("format.italic", "Italic", ("Primary+I",), True),
     CommandSpec("format.strike", "Strikethrough", ("Primary+Shift+X",), True),
@@ -51,6 +60,9 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("table.add_column", "Add Column Right"),
     CommandSpec("table.delete_row", "Delete Row"),
     CommandSpec("table.delete_column", "Delete Column"),
+    CommandSpec("view.zoom_in", "Zoom In", ("Primary++", "Primary+=")),
+    CommandSpec("view.zoom_out", "Zoom Out", ("Primary+-",)),
+    CommandSpec("view.zoom_reset", "Actual Size (100%)", ("Primary+Shift+0",)),
     CommandSpec("help.shortcuts", "Keyboard Shortcuts", ("Primary+/",)),
 )
 
